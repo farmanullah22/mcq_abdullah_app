@@ -1,0 +1,32 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/api/api_client.dart';
+import '../../features/analytics/data/analytics_repository.dart';
+import '../../features/audit/data/audit_repository.dart';
+import '../../features/auth/data/auth_repository.dart';
+import '../../features/categories/data/category_repository.dart';
+import '../../features/customers/data/customer_repository.dart';
+import '../../features/dashboard/data/dashboard_repository.dart';
+import '../../features/expenses/data/expense_repository.dart';
+import '../../features/inventory/data/inventory_repository.dart';
+import '../../features/notifications/data/notification_repository.dart';
+import '../../features/products/data/product_repository.dart';
+import '../../features/reports/data/report_repository.dart';
+import '../../features/sales/data/sale_repository.dart';
+import '../../features/shops/data/shop_repository.dart';
+import '../../features/suppliers/data/supplier_repository.dart';
+
+final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository(ref.watch(apiClientProvider)));
+final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) => DashboardRepository(ref.watch(apiClientProvider)));
+final shopRepositoryProvider = Provider<ShopRepository>((ref) => ShopRepository(ref.watch(apiClientProvider)));
+final categoryRepositoryProvider = Provider<CategoryRepository>((ref) => CategoryRepository(ref.watch(apiClientProvider)));
+final productRepositoryProvider = Provider<ProductRepository>((ref) => ProductRepository(ref.watch(apiClientProvider)));
+final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) => InventoryRepository(ref.watch(apiClientProvider)));
+final saleRepositoryProvider = Provider<SaleRepository>((ref) => SaleRepository(ref.watch(apiClientProvider)));
+final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) => ExpenseRepository(ref.watch(apiClientProvider)));
+final reportRepositoryProvider = Provider<ReportRepository>((ref) => ReportRepository(ref.watch(apiClientProvider)));
+final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) => AnalyticsRepository(ref.watch(apiClientProvider)));
+final auditRepositoryProvider = Provider<AuditRepository>((ref) => AuditRepository(ref.watch(apiClientProvider)));
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) => NotificationRepository(ref.watch(apiClientProvider)));
+final customerRepositoryProvider = Provider<CustomerRepository>((ref) => CustomerRepository(ref.watch(apiClientProvider)));
+final supplierRepositoryProvider = Provider<SupplierRepository>((ref) => SupplierRepository(ref.watch(apiClientProvider)));

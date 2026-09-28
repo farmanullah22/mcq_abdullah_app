@@ -1,0 +1,11 @@
+# Server logs — never commit
+server*.log
+*.server.pid
+
+# Environment / secrets — never commit
+.env
+.env.local
+*.env
+
+# Session artifacts / emulator logs — never commit
+.freebuff/
