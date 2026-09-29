@@ -6,10 +6,12 @@ import '../core/theme/app_colors.dart';
 import '../features/analytics/presentation/analytics_screen.dart';
 import '../features/audit/presentation/audit_logs_screen.dart';
 import '../features/audit/presentation/recent_activity_screen.dart';
+import '../features/auth/models/user.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../features/categories/presentation/category_screen.dart';
 import '../features/customers/presentation/customers_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
+import '../features/dashboard/presentation/warehouse_dashboard_screen.dart';
 import '../features/expenses/presentation/expense_list_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/managers/presentation/managers_screen.dart';
@@ -32,13 +34,25 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   static const _routes = ['dashboard', 'sales', 'inventory', 'customers', 'suppliers'];
 
+  List<String> _routesFor(User? user) {
+    if ((user?.isWarehouseManager ?? false) == true) {
+      return const ['dashboard', 'inventory', 'suppliers'];
+    }
+    return _routes;
+  }
+
   int _index = 0;
   final Map<String, Widget> _cache = {};
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  Widget _screenFor(String route) => _cache.putIfAbsent(route, () {
+  Widget _screenFor(String route, {required bool isWarehouse}) => _cache.putIfAbsent(route, () {
         switch (route) {
           case 'dashboard':
+            if (isWarehouse) {
+              return WarehouseDashboardScreen(
+                onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+              );
+            }
             return DashboardScreen(
               onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
             );
@@ -58,7 +72,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final isAdmin = user?.isAdmin ?? false;
-    final index = _index < _routes.length ? _index : _routes.length - 1;
+    final isWarehouse = user?.isWarehouseManager ?? false;
+    final routes = _routesFor(user);
+    final index = _index < routes.length ? _index : routes.length - 1;
 
     return Stack(
       fit: StackFit.expand,
@@ -71,12 +87,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           backgroundColor: Colors.transparent,
           body: IndexedStack(
             index: index,
-            children: [for (final route in _routes) _screenFor(route)],
+            children: [for (final route in routes) _screenFor(route, isWarehouse: isWarehouse)],
           ),
-          drawer: _buildDrawer(context, isAdmin),
+          drawer: _buildDrawer(context, isAdmin, isWarehouse),
           bottomNavigationBar: _PremiumBottomNav(
             currentIndex: index,
-            routes: _routes,
+            routes: routes,
             onTap: (i) => setState(() => _index = i),
           ),
         ),
@@ -84,10 +100,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
   }
 
-  Drawer _buildDrawer(BuildContext context, bool isAdmin) {
+  Drawer _buildDrawer(BuildContext context, bool isAdmin, bool isWarehouse) {
     final theme = Theme.of(context);
     final user = ref.read(currentUserProvider);
-    final scope = isAdmin ? 'Administrator' : (user?.assignedShopName ?? 'Shop Manager');
+    final scope = isAdmin
+        ? 'Administrator'
+        : (isWarehouse ? 'Warehouse Manager' : (user?.assignedShopName ?? 'Shop Manager'));
 
     return Drawer(
       child: ListView(
@@ -152,9 +170,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
           const _DrawerSection('Navigation'),
           _DrawerItem(icon: Icons.dashboard_outlined, label: 'Dashboard', onTap: () => _go('dashboard')),
-          _DrawerItem(icon: Icons.point_of_sale_outlined, label: 'Sales', onTap: () => _go('sales')),
+          if (!isWarehouse)
+            _DrawerItem(icon: Icons.point_of_sale_outlined, label: 'Sales', onTap: () => _go('sales')),
           _DrawerItem(icon: Icons.inventory_2_outlined, label: 'Inventory', onTap: () => _go('inventory')),
-          _DrawerItem(icon: Icons.people_outline, label: 'Customers', onTap: () => _go('customers')),
+          if (!isWarehouse)
+            _DrawerItem(icon: Icons.people_outline, label: 'Customers', onTap: () => _go('customers')),
           _DrawerItem(icon: Icons.local_shipping_outlined, label: 'Suppliers', onTap: () => _go('suppliers')),
           const Divider(),
           const _DrawerSection('Modules'),
@@ -213,7 +233,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   void _go(String route) {
     Navigator.of(context).pop();
-    setState(() => _index = _routes.indexOf(route));
+    setState(() => _index = _routesFor(ref.read(currentUserProvider)).indexOf(route));
   }
 
   void _open(Widget screen) {

@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const { recordAudit } = require('../middleware/auth');
+const { getWarehouseShop } = require('../utils/warehouse');
 
 const buildProductQuery = (req) => {
   const filter = { isDeleted: false };
@@ -134,11 +135,25 @@ const createProduct = asyncHandler(async (req, res) => {
 
   if (!name) throw new ApiError(400, 'Product name is required.');
 
+  // Products are born at the warehouse: branch managers create catalog
+  // entries centrally and stock enters here, then Stock Transfer pushes it to
+  // branches. Admins may still pass an explicit shopId to repair data, but
+  // the default target is the warehouse too.
+  const Shop = require('../models/Shop');
+  const warehouse = await getWarehouseShop(Shop);
   const shopId =
     req.user.role === 'manager'
-      ? req.user.assignedShop._id
-      : req.body.shopId || req.shopId || (await require('../models/Shop').findOne({ isDeleted: false }))._id;
-  if (!shopId) throw new ApiError(400, 'shopId is required.');
+      ? warehouse?._id
+      : req.body.shopId || req.shopId || warehouse?._id;
+  if (!shopId) throw new ApiError(503, 'No warehouse is configured. Add a shop with shopType=warehouse.');
+
+  const existing = await Product.findOne({ shop: shopId, name, isDeleted: false });
+  if (existing) {
+    throw new ApiError(
+      409,
+      `A product named "${name}" already exists at the ${req.user.role === 'manager' || !req.body.shopId ? 'warehouse' : 'selected shop'}. Use Stock In to add quantity, or edit the existing product.`
+    );
+  }
 
   const { quantity, costPrice } = calcQuantityAndCost(req.body);
 
@@ -184,7 +199,7 @@ const createProduct = asyncHandler(async (req, res) => {
     recordId: product._id,
     recordType: 'Product',
     newData: product.toObject(),
-    remarks: `Product "${product.name}" created`,
+    remarks: `Product "${product.name}" created at warehouse`,
     shopId,
   });
 

@@ -7,7 +7,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // Server base URL.
-  static const String baseUrl = 'https://api.saisinghshope.me/api';
+  static const String baseUrl = 'http://10.0.2.2:5000/api';
 
   static const String currencySymbol = 'Rs.';
 

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/status_views.dart';
+import '../../inventory/presentation/stock_screens.dart';
 import '../../products/models/product.dart';
 import '../providers/product_providers.dart';
 
@@ -321,7 +322,27 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
     if (!mounted) return;
     if (ok) {
-      Navigator.of(context).pop();
+      if (_isEdit) {
+        Navigator.of(context).pop();
+      } else {
+        final navigator = Navigator.of(context);
+        final messenger = ScaffoldMessenger.of(context);
+        final newId = ref.read(productMutationControllerProvider).product?.id;
+        navigator.pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Product saved at the Warehouse'),
+            action: newId == null
+                ? null
+                : SnackBarAction(
+                    label: 'Stock In →',
+                    onPressed: () => navigator.push(
+                      MaterialPageRoute(builder: (_) => StockInScreen(productId: newId)),
+                    ),
+                  ),
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ref.read(productMutationControllerProvider).error ?? 'Failed to save product')),
@@ -341,6 +362,28 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (!_isEdit)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warehouse_outlined, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'New products are created at the Warehouse. Add quantity via Stock In, then transfer to a branch.',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primary, height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               TextFormField(
                 controller: _name,
                 validator: (v) => Validators.required(v),

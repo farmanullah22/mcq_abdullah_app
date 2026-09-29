@@ -122,7 +122,7 @@ const getDashboard = asyncHandler(async (req, res) => {
 const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => {
   const shop = req.user.assignedShop;
 
-  const [todaySales, customerCount, supplierCount, lowStock, inventoryLogs, auditLogs, productList] = await Promise.all([
+  const [todaySales, customerCount, supplierCount, lowStock, inventoryLogs, auditLogs, productList, stockInToday, stockOutToday] = await Promise.all([
     stats.getSalesTotal(stats.dateRange('today'), shopId),
     Customer.countDocuments({ isDeleted: false, shop: shopId }),
     Supplier.countDocuments({ isDeleted: false, shop: shopId }),
@@ -144,9 +144,11 @@ const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => 
       .limit(10)
       .select('actionType remarks timestamp performedByName'),
     Product.find({ isDeleted: false, shop: shopId })
-      .select('name sku barcode size images colorStocks quantity lowStockThreshold productType')
+      .select('name sku barcode size colorStocks quantity lowStockThreshold productType')
       .sort({ createdAt: -1 })
       .limit(50),
+    countStockAction(shopId, 'STOCK_IN'),
+    countStockAction(shopId, 'STOCK_OUT'),
   ]);
 
   const recentActivity = [
@@ -175,8 +177,8 @@ const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => 
       salesToday: todaySales.total,
       supplierCount,
       customerCount,
-      stockInToday: await countStockAction(shopId, 'STOCK_IN'),
-      stockOutToday: await countStockAction(shopId, 'STOCK_OUT'),
+      stockInToday,
+      stockOutToday,
     },
     lowStock: lowStock.map((p) => ({
       id: p._id,
@@ -195,7 +197,7 @@ const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => 
       name: p.name,
       code: p.sku || p.barcode || '',
       size: p.size || '',
-      image: Array.isArray(p.images) && p.images[0] ? p.images[0] : '',
+      image: '',
       quantity: p.quantity,
       lowStockThreshold: p.lowStockThreshold,
       productType: p.productType,

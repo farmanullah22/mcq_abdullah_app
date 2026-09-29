@@ -985,7 +985,10 @@ class _StockInScreenState extends ConsumerState<StockInScreen> {
           _warehouseProducts = raw.map(Product.fromJson).toList();
           _warehouseLoading = false;
           _warehouseName = warehouse?['name']?.toString() ?? 'Warehouse';
-          if (_productId == null && _warehouseProducts.isNotEmpty) {
+          if (_productId != null) {
+            final matches = _warehouseProducts.where((p) => p.id == _productId).toList();
+            _selectedProduct = matches.isNotEmpty ? matches.first : null;
+          } else if (_warehouseProducts.isNotEmpty) {
             _productId = _warehouseProducts.first.id;
             _selectedProduct = _warehouseProducts.first;
           }
