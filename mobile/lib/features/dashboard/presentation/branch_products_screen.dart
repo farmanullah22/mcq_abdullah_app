@@ -189,18 +189,12 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unit = product.productType == 'carpet'
+    final unit = product.productType == 'carpet' && !product.usesVariants
         ? 'sqft'
         : product.productType == 'meter'
         ? 'm'
         : 'pcs';
-    final typeLabel = switch (product.productType) {
-      'carpet' => 'Carpet',
-      'meter' => 'Meter',
-      'foam' => 'Foam',
-      'pillow' => 'Pillow',
-      _ => 'Qaleen',
-    };
+    final typeLabel = product.typeLabel;
     final typeIcon = switch (product.productType) {
       'carpet' => Icons.grid_on,
       'meter' => Icons.straighten,

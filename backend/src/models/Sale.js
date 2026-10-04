@@ -11,6 +11,15 @@ const carpetPieceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const variantSchema = new mongoose.Schema(
+  {
+    color: { type: String, default: '' },
+    size: { type: String, default: '' },
+    quantity: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
 const saleItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -24,6 +33,9 @@ const saleItemSchema = new mongoose.Schema(
     coverQty: { type: Number, default: 0, min: 0 },
     // The exact physical piece / meters deducted from dimensional stock.
     carpetPiece: { type: carpetPieceSchema, default: null },
+    // The exact colour x size rows deducted, so reversing the sale returns
+    // stock to the same rows instead of guessing.
+    variants: { type: [variantSchema], default: [] },
     length: { type: Number, default: 0 },
   },
   { _id: false }

@@ -495,9 +495,22 @@ class _BranchFeatureButton extends StatelessWidget {
 }
 
 String _typeLabel(String productType) {
-  if (productType == 'carpet') return 'Carpet';
-  if (productType == 'meter') return 'Meter';
-  return 'Qaleen';
+  switch (productType) {
+    case 'carpet':
+      return 'Carpet';
+    case 'meter':
+      return 'Meter';
+    case 'foam':
+      return 'Foam';
+    case 'foam_cover':
+      return 'Foam Cover';
+    case 'pillow_cover':
+      return 'Pillow Cover';
+    case 'pillow':
+      return 'Pillow';
+    default:
+      return 'Qaleen';
+  }
 }
 
 class _OverviewHeader extends ConsumerWidget {

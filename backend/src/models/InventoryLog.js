@@ -20,6 +20,15 @@ const qaleenSizeSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const variantSchema = new mongoose.Schema(
+  {
+    color: { type: String, default: '', trim: true },
+    size: { type: String, default: '', trim: true },
+    quantity: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
 const inventoryLogSchema = new mongoose.Schema(
   {
     shop: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', required: true },
@@ -29,6 +38,7 @@ const inventoryLogSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 0 },
     carpetPieces: { type: [carpetPieceSchema], default: [] },
     qaleenSizes: { type: [qaleenSizeSchema], default: [] },
+    variants: { type: [variantSchema], default: [] },
     length: { type: Number, default: 0 },
     previousStock: { type: Number, required: true, default: 0 },
     newStock: { type: Number, required: true, default: 0 },

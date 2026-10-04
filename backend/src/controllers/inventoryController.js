@@ -7,12 +7,28 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const { recordAudit } = require('../middleware/auth');
 const { getWarehouseShop, ensureWarehouseCopy, isWarehouse } = require('../utils/warehouse');
+const {
+  isVariantType,
+  usesColorRows,
+  hasVariants,
+  isLegacyCarpet,
+  normalizeVariants,
+  variantTotal,
+  mergeVariants,
+  subtractVariants,
+} = require('../utils/variants');
 
 const assertShopAccess = (product, user) => {
   if (user.role === 'manager' && product.shop.toString() !== user.assignedShop._id.toString()) {
     throw new ApiError(403, 'You can only manage inventory of your assigned shop.');
   }
 };
+
+// Old carpets are tracked piece-by-piece (width x height -> area) and keep
+// their dedicated flow. The re-designed carpet is a colour x size x quantity
+// product like foam, so only carpets with actual piece data are "legacy".
+// (isLegacyCarpet now lives in utils/variants so the product, inventory and
+// sale controllers all agree on what counts as a legacy carpet.)
 
 const normalizeCarpetPieces = (arr) =>
   Array.isArray(arr)
@@ -85,7 +101,7 @@ const maybeNotifyLowStock = async (product, user) => {
 };
 
 const stockIn = asyncHandler(async (req, res) => {
-  const { productId, quantity, supplier, date, notes, carpetPieces, qaleenSizes, length } = req.body;
+  const { productId, quantity, supplier, date, notes, carpetPieces, qaleenSizes, length, variants } = req.body;
   if (!productId) {
     throw new ApiError(400, 'Product is required.');
   }
@@ -105,8 +121,22 @@ const stockIn = asyncHandler(async (req, res) => {
   let logPieces = [];
   let logSizes = [];
   let logLength = 0;
+  let logVariants = [];
 
-  if (pt === 'carpet') {
+  // New-style products must be stocked in with colour rows so the
+  // product.quantity === sum(variant.quantity) invariant holds.
+  if (usesColorRows(pt) && !isLegacyCarpet(product) && !Array.isArray(variants)) {
+    throw new ApiError(400, 'Stock this product by colour rows. Enter the colours you are adding.');
+  }
+  if (usesColorRows(pt) && Array.isArray(variants)) {
+    const vars = normalizeVariants(variants);
+    if (vars.length === 0) {
+      throw new ApiError(400, 'Enter at least one colour with a positive quantity.');
+    }
+    product.variants = mergeVariants(product.variants, vars);
+    addedQty = vars.reduce((sum, v) => sum + v.quantity, 0);
+    logVariants = vars;
+  } else if (pt === 'carpet') {
     const pieces = normalizeCarpetPieces(carpetPieces);
     if (pieces.length === 0) {
       throw new ApiError(400, 'Width and height are required for each carpet piece.');
@@ -143,7 +173,13 @@ const stockIn = asyncHandler(async (req, res) => {
     addedQty = q;
   }
 
-  product.quantity = Number(product.quantity || 0) + addedQty;
+  // For colour x size products the total is always recomputed from the rows so
+  // product.quantity can never drift away from the sum of its variants.
+  if (hasVariants(product)) {
+    product.quantity = variantTotal(product.variants);
+  } else {
+    product.quantity = Number(product.quantity || 0) + addedQty;
+  }
   await product.save();
 
   await InventoryLog.create({
@@ -162,6 +198,7 @@ const stockIn = asyncHandler(async (req, res) => {
     carpetPieces: logPieces,
     qaleenSizes: logSizes,
     length: logLength,
+    variants: logVariants,
   });
 
   await recordAudit(req, {
@@ -176,6 +213,7 @@ const stockIn = asyncHandler(async (req, res) => {
       carpetPieces: logPieces.length ? logPieces : undefined,
       qaleenSizes: logSizes.length ? logSizes : undefined,
       length: logLength || undefined,
+      variants: logVariants.length ? logVariants : undefined,
     },
     remarks: `Stock in ${Math.round(addedQty)} x "${product.name}"`,
     shopId: product.shop,
@@ -185,7 +223,7 @@ const stockIn = asyncHandler(async (req, res) => {
 });
 
 const stockOut = asyncHandler(async (req, res) => {
-  const { productId, quantity, reason, date, notes, carpetPieces, qaleenSizes, length } = req.body;
+  const { productId, quantity, reason, date, notes, carpetPieces, qaleenSizes, length, variants } = req.body;
   if (!productId) {
     throw new ApiError(400, 'Product is required.');
   }
@@ -205,8 +243,23 @@ const stockOut = asyncHandler(async (req, res) => {
   let logPieces = [];
   let logSizes = [];
   let logLength = 0;
+  let logVariants = [];
 
-  if (pt === 'carpet') {
+  if (usesColorRows(pt) && Array.isArray(variants)) {
+    const vars = normalizeVariants(variants);
+    if (vars.length === 0) {
+      throw new ApiError(400, 'Select at least one colour with a quantity to remove.');
+    }
+    if (!hasVariants(product)) {
+      throw new ApiError(400, 'This product has no colour stock rows yet.');
+    }
+    const res = subtractVariants(product.variants, vars);
+    product.variants = res.variants;
+    removedQty = res.moved.reduce((sum, m) => sum + m.quantity, 0);
+    logVariants = res.moved;
+  } else if (usesColorRows(pt) && !isLegacyCarpet(product)) {
+    throw new ApiError(400, 'Remove stock by colour rows. Select the colours to remove.');
+  } else if (pt === 'carpet') {
     const requested = normalizeCarpetPieces(carpetPieces);
     if (requested.length === 0) {
       const q = Number(quantity);
@@ -289,7 +342,11 @@ const stockOut = asyncHandler(async (req, res) => {
     removedQty = q;
   }
 
-  product.quantity = Math.max(0, Number(product.quantity || 0) - removedQty);
+  if (hasVariants(product)) {
+    product.quantity = variantTotal(product.variants);
+  } else {
+    product.quantity = Math.max(0, Number(product.quantity || 0) - removedQty);
+  }
   await product.save();
 
   await InventoryLog.create({
@@ -307,6 +364,7 @@ const stockOut = asyncHandler(async (req, res) => {
     carpetPieces: logPieces,
     qaleenSizes: logSizes,
     length: logLength,
+    variants: logVariants,
   });
 
   await recordAudit(req, {
@@ -321,6 +379,7 @@ const stockOut = asyncHandler(async (req, res) => {
       carpetPieces: logPieces.length ? logPieces : undefined,
       qaleenSizes: logSizes.length ? logSizes : undefined,
       length: logLength || undefined,
+      variants: logVariants.length ? logVariants : undefined,
     },
     remarks: `Stock out ${Math.round(removedQty)} x "${product.name}"${reason ? ` - ${reason}` : ''}`,
     shopId: product.shop,
@@ -332,7 +391,7 @@ const stockOut = asyncHandler(async (req, res) => {
 });
 
 const transferStock = asyncHandler(async (req, res) => {
-  const { fromShopId, toShopId, productId, quantity, date, notes, carpetPieces, qaleenSizes, length } = req.body;
+  const { fromShopId, toShopId, productId, quantity, date, notes, carpetPieces, qaleenSizes, length, variants } = req.body;
   if (!fromShopId || !toShopId || !productId) {
     throw new ApiError(400, 'Source shop, destination shop and product are required.');
   }
@@ -378,8 +437,23 @@ const transferStock = asyncHandler(async (req, res) => {
   let movedPieces = [];
   let movedSizes = [];
   let movedLength = 0;
+  let movedVariants = [];
 
-  if (pt === 'carpet') {
+  if (usesColorRows(pt) && Array.isArray(variants)) {
+    const vars = normalizeVariants(variants);
+    if (vars.length === 0) {
+      throw new ApiError(400, 'Select at least one colour with a quantity to transfer.');
+    }
+    if (!hasVariants(fromProduct)) {
+      throw new ApiError(400, `"${fromProduct.name}" has no colour stock rows yet.`);
+    }
+    const res = subtractVariants(fromProduct.variants, vars);
+    fromProduct.variants = res.variants;
+    movedVariants = res.moved;
+    moveQty = res.moved.reduce((sum, m) => sum + m.quantity, 0);
+  } else if (usesColorRows(pt) && !isLegacyCarpet(fromProduct)) {
+    throw new ApiError(400, 'Transfer stock by colour rows. Select the colours to move.');
+  } else if (pt === 'carpet') {
     const requested = normalizeCarpetPieces(carpetPieces);
     if (requested.length === 0) {
       const q = Number(quantity);
@@ -465,7 +539,11 @@ const transferStock = asyncHandler(async (req, res) => {
 
   if (!(moveQty > 0)) throw new ApiError(400, 'Nothing to transfer.');
 
-  fromProduct.quantity = Math.max(0, Number(fromProduct.quantity || 0) - moveQty);
+  if (hasVariants(fromProduct)) {
+    fromProduct.quantity = variantTotal(fromProduct.variants);
+  } else {
+    fromProduct.quantity = Math.max(0, Number(fromProduct.quantity || 0) - moveQty);
+  }
 
   // Resolve the matching product in the destination shop (by name). If it does
   // not exist yet, create it so stock moves against the same logical product.
@@ -501,13 +579,17 @@ const transferStock = asyncHandler(async (req, res) => {
       size: fromProduct.size,
       description: fromProduct.description,
       images: fromProduct.images,
+      variants: [],
       shop: toShopId,
     });
     destinationCreated = true;
   }
 
   // Apply the moved stock to the destination product (dimension-aware).
-  if (pt === 'carpet') {
+  if (isVariantType(pt) && movedVariants.length > 0) {
+    toProduct.variants = mergeVariants(toProduct.variants, movedVariants);
+    toProduct.quantity = variantTotal(toProduct.variants);
+  } else if (pt === 'carpet') {
     if (movedPieces.length > 0) {
       promoteLegacyCarpet(toProduct);
       toProduct.carpetPiecesData.push(...movedPieces);
@@ -547,6 +629,7 @@ const transferStock = asyncHandler(async (req, res) => {
       carpetPieces: movedPieces,
       qaleenSizes: movedSizes,
       length: movedLength,
+      variants: movedVariants,
     },
     {
       shop: toProduct.shop,
@@ -564,6 +647,7 @@ const transferStock = asyncHandler(async (req, res) => {
       carpetPieces: movedPieces,
       qaleenSizes: movedSizes,
       length: movedLength,
+      variants: movedVariants,
     },
   ]);
 
@@ -580,6 +664,7 @@ const transferStock = asyncHandler(async (req, res) => {
       carpetPieces: movedPieces.length ? movedPieces : undefined,
       qaleenSizes: movedSizes.length ? movedSizes : undefined,
       length: movedLength || undefined,
+      variants: movedVariants.length ? movedVariants : undefined,
     },
     remarks: `Transferred ${Math.round(moveQty)} x "${fromProduct.name}" from ${fromShop.name} to ${toShop.name}`,
     shopId: fromProduct.shop,
@@ -629,7 +714,7 @@ const shopProducts = asyncHandler(async (req, res) => {
     .select(
       'name sku quantity sellingPrice costPrice category lowStockThreshold productType images ' +
         'carpetPiecesData carpetWidth carpetHeight carpetPieces costPerSqft ' +
-        'qaleenSizes costPerPiece meterLength costPerMeter color size'
+        'qaleenSizes costPerPiece meterLength costPerMeter color size variants'
     );
   res.json(ApiResponse.ok('Shop products fetched', products));
 });

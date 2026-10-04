@@ -5,6 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const { recordAudit } = require('../middleware/auth');
 const { getWarehouseShop } = require('../utils/warehouse');
+const { isVariantType, usesColorRows, isLegacyCarpet, normalizeVariants, variantTotal } = require('../utils/variants');
 
 const buildProductQuery = (req) => {
   const filter = { isDeleted: false };
@@ -60,12 +61,36 @@ const getProduct = asyncHandler(async (req, res) => {
   res.json(ApiResponse.ok('Product fetched', product));
 });
 
+// Foam Cover, Pillow Cover and Carpet cannot exist without at least one colour
+// row, otherwise they would silently have zero stock. Foam carries a plain
+// quantity and legacy carpets keep their piece/sqft flow, so both are exempt.
+const assertVariantGrid = (body) => {
+  const pt = body.productType || 'qaleen';
+  if (!usesColorRows(pt) || isLegacyCarpet(body)) return;
+  if (normalizeVariants(body.variants).length === 0) {
+    throw new ApiError(
+      400,
+      'Add at least one colour with a quantity greater than zero. Stock is tracked per colour.'
+    );
+  }
+};
+
 const calcQuantityAndCost = (body) => {
   const pt = body.productType || 'qaleen';
   const colorStockQty =
     Array.isArray(body.colorStocks) && body.colorStocks.length > 0
       ? body.colorStocks.reduce((sum, c) => sum + (Number(c.pieces) || 0), 0)
       : null;
+  // Foam Cover / Pillow Cover / Carpet stock by colour rows; quantity is the sum
+  // of those rows and the cost is a single per-piece figure. Foam only takes this
+  // path when it still carries legacy variant rows, otherwise it falls through
+  // to its plain-quantity branch below.
+  if (isVariantType(pt)) {
+    const variants = normalizeVariants(body.variants);
+    if (variants.length > 0) {
+      return { quantity: variantTotal(variants), costPrice: Number(body.costPrice) || 0 };
+    }
+  }
   if (pt === 'carpet') {
     const costPerSqft = Number(body.costPerSqft) || 0;
     const pieces = Array.isArray(body.carpetPiecesData) ? body.carpetPiecesData : [];
@@ -130,10 +155,13 @@ const createProduct = asyncHandler(async (req, res) => {
     carpetWidth, carpetHeight, carpetPieces, carpetPiecesData, costPerSqft,
     costPerPiece, qaleenSizes,
     meterLength, costPerMeter,
-    foamLength, foamWidth, foamThickness, pillowSize, sizeStocks, pillowStock, coverStock,
+    foamLength, foamWidth, foamThickness, foamType, pillowSize, sizeStocks, pillowStock, coverStock,
+    variants,
   } = req.body;
 
   if (!name) throw new ApiError(400, 'Product name is required.');
+
+  assertVariantGrid({ ...req.body, productType: productType || 'qaleen' });
 
   // Products are born at the warehouse: branch managers create catalog
   // entries centrally and stock enters here, then Stock Transfer pushes it to
@@ -177,6 +205,7 @@ const createProduct = asyncHandler(async (req, res) => {
     foamLength: foamLength || 0,
     foamWidth: foamWidth || 0,
     foamThickness: foamThickness || 0,
+    foamType: foamType || '',
     pillowSize: pillowSize || '',
     sizeStocks: sizeStocks || [],
     pillowStock: pillowStock || 0,
@@ -190,6 +219,7 @@ const createProduct = asyncHandler(async (req, res) => {
     description: description || '',
     images: images || [],
     colorStocks: colorStocks || [],
+    variants: normalizeVariants(variants),
     shop: shopId,
   });
 
@@ -221,19 +251,31 @@ const updateProduct = asyncHandler(async (req, res) => {
     'carpetWidth', 'carpetHeight', 'carpetPieces', 'carpetPiecesData', 'costPerSqft',
     'costPerPiece', 'qaleenSizes',
     'meterLength', 'costPerMeter',
-    'foamLength', 'foamWidth', 'foamThickness', 'pillowSize', 'sizeStocks',
+    'foamLength', 'foamWidth', 'foamThickness', 'foamType', 'pillowSize', 'sizeStocks',
     'pillowStock', 'coverStock',
+    'costPrice', 'variants',
   ];
   allowed.forEach((field) => {
     if (req.body[field] !== undefined) product[field] = req.body[field];
   });
 
+  if (Array.isArray(product.variants)) product.variants = normalizeVariants(product.variants);
+
+  assertVariantGrid(product.toObject());
+
+  // The cost price is recalculated from the body below, so an explicit cost
+  // that was just copied in must not be treated as a derived value.
+  const requestedCost = req.body.costPrice !== undefined ? Number(req.body.costPrice) || 0 : null;
+
   const { quantity, costPrice } = calcQuantityAndCost(product.toObject());
   product.quantity = quantity;
-  product.costPrice = costPrice;
+  product.costPrice = requestedCost !== null ? requestedCost : costPrice;
 
   await product.save();
-  await product.populate('category', 'name').populate('shop', 'name');
+  // Document#populate resolves to a promise, so the two paths are awaited
+  // separately instead of being chained.
+  await product.populate('category', 'name');
+  await product.populate('shop', 'name');
 
   await recordAudit(req, {
     actionType: 'UPDATE_PRODUCT',

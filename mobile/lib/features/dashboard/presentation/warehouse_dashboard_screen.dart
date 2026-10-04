@@ -34,10 +34,12 @@ class WarehouseDashboardScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenDrawer;
 
   @override
-  ConsumerState<WarehouseDashboardScreen> createState() => _WarehouseDashboardScreenState();
+  ConsumerState<WarehouseDashboardScreen> createState() =>
+      _WarehouseDashboardScreenState();
 }
 
-class _WarehouseDashboardScreenState extends ConsumerState<WarehouseDashboardScreen> {
+class _WarehouseDashboardScreenState
+    extends ConsumerState<WarehouseDashboardScreen> {
   final _searchController = TextEditingController();
 
   @override
@@ -85,7 +87,8 @@ class _WarehouseDashboardScreenState extends ConsumerState<WarehouseDashboardScr
               loading: () => _LoadingView(message: 'Loading your warehouse...'),
               error: (e, st) => _ErrorView(
                 message: e.toString(),
-                onRetry: () => ref.read(dashboardControllerProvider.notifier).refresh(),
+                onRetry: () =>
+                    ref.read(dashboardControllerProvider.notifier).refresh(),
               ),
               data: (data) => RefreshIndicator(
                 color: _gold,
@@ -111,11 +114,16 @@ class _WarehouseDashboardScreenState extends ConsumerState<WarehouseDashboardScr
                     _WarehouseCatalog(
                       searchController: _searchController,
                       state: productState,
-                      onSearch: (v) => ref.read(productListControllerProvider.notifier).setSearch(v),
-                      onRetry: () => ref.read(productListControllerProvider.notifier).refresh(),
+                      onSearch: (v) => ref
+                          .read(productListControllerProvider.notifier)
+                          .setSearch(v),
+                      onRetry: () => ref
+                          .read(productListControllerProvider.notifier)
+                          .refresh(),
                       onOpen: (p) => _push(ProductDetailScreen(product: p)),
                       onStockIn: (p) => _pushStockIn(p.id),
-                      onTransfer: (p) => _pushAndRefresh(const StockTransferScreen()),
+                      onTransfer: (p) =>
+                          _pushAndRefresh(const StockTransferScreen()),
                     ),
                     const SizedBox(height: 28),
                     _SectionTitle(
@@ -124,7 +132,9 @@ class _WarehouseDashboardScreenState extends ConsumerState<WarehouseDashboardScr
                           ? 'All products are well stocked'
                           : '${data.lowStock.length} product${data.lowStock.length == 1 ? '' : 's'} need attention',
                       actionLabel: data.lowStock.isEmpty ? null : 'View All',
-                      action: data.lowStock.isEmpty ? null : () => _push(const LowStockScreen()),
+                      action: data.lowStock.isEmpty
+                          ? null
+                          : () => _push(const LowStockScreen()),
                     ),
                     const SizedBox(height: 12),
                     _LowStockCard(items: data.lowStock),
@@ -156,20 +166,13 @@ class _WarehouseBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          'lib/images/admin_dashboard.jfif',
-          fit: BoxFit.cover,
-        ),
+        Image.asset('lib/images/admin_dashboard.jfif', fit: BoxFit.cover),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0x38050505),
-                Color(0x70050505),
-                Color(0x9C050505),
-              ],
+              colors: [Color(0x38050505), Color(0x70050505), Color(0x9C050505)],
               stops: [0, 0.55, 1],
             ),
           ),
@@ -187,7 +190,10 @@ class _WarehouseBackdrop extends StatelessWidget {
         Positioned(
           bottom: 60,
           right: -120,
-          child: _Glow(size: 300, color: const Color(0xFF3A2E10).withValues(alpha: 0.34)),
+          child: _Glow(
+            size: 300,
+            color: const Color(0xFF3A2E10).withValues(alpha: 0.34),
+          ),
         ),
         const CarpetPattern(opacity: 0.05),
       ],
@@ -209,9 +215,7 @@ class _Glow extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
-          ),
+          gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
         ),
       ),
     );
@@ -307,7 +311,10 @@ class _LuxHeader extends StatelessWidget {
             Container(
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(color: _gold, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                color: _gold,
+                shape: BoxShape.circle,
+              ),
             ),
             const SizedBox(width: 7),
             Text(
@@ -408,10 +415,7 @@ class _LuxBell extends ConsumerWidget {
                 ),
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
-                  BoxShadow(
-                    color: _gold.withValues(alpha: 0.5),
-                    blurRadius: 8,
-                  ),
+                  BoxShadow(color: _gold.withValues(alpha: 0.5), blurRadius: 8),
                 ],
               ),
               constraints: const BoxConstraints(minWidth: 16),
@@ -460,7 +464,10 @@ class _GoldDividerPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawLine(Offset(0, midY), Offset(size.width * 0.42, midY), line);
     canvas.drawLine(
-        Offset(size.width * 0.58, midY), Offset(size.width, midY), line);
+      Offset(size.width * 0.58, midY),
+      Offset(size.width, midY),
+      line,
+    );
 
     final diamond = Paint()..color = _goldLight;
     final center = Offset(size.width / 2, midY);
@@ -499,8 +506,18 @@ class _WarehouseOverviewState extends State<_WarehouseOverview> {
     super.dispose();
   }
 
-  List<({IconData icon, String label, String subtitle, num value, bool currency, Color color, VoidCallback? onTap})>
-      get _cards {
+  List<
+    ({
+      IconData icon,
+      String label,
+      String subtitle,
+      num value,
+      bool currency,
+      Color color,
+      VoidCallback? onTap,
+    })
+  >
+  get _cards {
     final c = widget.cards;
     return [
       (
@@ -528,9 +545,9 @@ class _WarehouseOverviewState extends State<_WarehouseOverview> {
         value: c.lowStockCount,
         currency: false,
         color: AppColors.premiumRedLight,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const LowStockScreen()),
-        ),
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const LowStockScreen())),
       ),
       (
         icon: Icons.swap_horiz_rounded,
@@ -582,9 +599,13 @@ class _WarehouseOverviewState extends State<_WarehouseOverview> {
               height: 8,
               decoration: BoxDecoration(
                 gradient: i == _current
-                    ? const LinearGradient(colors: [_goldLight, _gold, _goldDark])
+                    ? const LinearGradient(
+                        colors: [_goldLight, _gold, _goldDark],
+                      )
                     : null,
-                color: i == _current ? null : Colors.white.withValues(alpha: 0.18),
+                color: i == _current
+                    ? null
+                    : Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -651,7 +672,10 @@ class _OverviewCard extends StatelessWidget {
                   color: color,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: color.withValues(alpha: 0.7), blurRadius: 8),
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.7),
+                      blurRadius: 8,
+                    ),
                   ],
                 ),
               ),
@@ -696,7 +720,11 @@ class _OverviewCard extends StatelessWidget {
     if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(borderRadius: BorderRadius.circular(24), onTap: onTap, child: card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: card,
+      ),
     );
   }
 }
@@ -708,26 +736,27 @@ class _WarehouseActionRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final actions = <({String label, IconData icon, Color color, Widget screen})>[
-      (
-        label: 'Stock In',
-        icon: Icons.south_west_rounded,
-        color: const Color(0xFF6FBE8C),
-        screen: const StockInScreen(),
-      ),
-      (
-        label: 'Stock Transfer',
-        icon: Icons.swap_horiz_rounded,
-        color: _goldLight,
-        screen: const StockTransferScreen(),
-      ),
-      (
-        label: 'Add Product',
-        icon: Icons.add_box_outlined,
-        color: const Color(0xFF7FB5E8),
-        screen: const ProductFormScreen(),
-      ),
-    ];
+    final actions =
+        <({String label, IconData icon, Color color, Widget screen})>[
+          (
+            label: 'Stock In',
+            icon: Icons.south_west_rounded,
+            color: const Color(0xFF6FBE8C),
+            screen: const StockInScreen(),
+          ),
+          (
+            label: 'Stock Transfer',
+            icon: Icons.swap_horiz_rounded,
+            color: _goldLight,
+            screen: const StockTransferScreen(),
+          ),
+          (
+            label: 'Add Product',
+            icon: Icons.add_box_outlined,
+            color: const Color(0xFF7FB5E8),
+            screen: const ProductFormScreen(),
+          ),
+        ];
     return Row(
       children: actions
           .map(
@@ -744,10 +773,14 @@ class _WarehouseActionRow extends ConsumerWidget {
                       navigator
                           .push(MaterialPageRoute(builder: (_) => a.screen))
                           .then((_) async {
-                        await ref.read(dashboardControllerProvider.notifier).refresh();
-                        await ref.read(productListControllerProvider.notifier).refresh();
-                        ref.invalidate(inventoryHistoryControllerProvider);
-                      });
+                            await ref
+                                .read(dashboardControllerProvider.notifier)
+                                .refresh();
+                            await ref
+                                .read(productListControllerProvider.notifier)
+                                .refresh();
+                            ref.invalidate(inventoryHistoryControllerProvider);
+                          });
                     },
                     child: Ink(
                       decoration: BoxDecoration(
@@ -776,7 +809,9 @@ class _WarehouseActionRow extends ConsumerWidget {
                                   decoration: BoxDecoration(
                                     color: a.color.withValues(alpha: 0.18),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: a.color.withValues(alpha: 0.55)),
+                                    border: Border.all(
+                                      color: a.color.withValues(alpha: 0.55),
+                                    ),
                                   ),
                                   child: Icon(a.icon, size: 20, color: a.color),
                                 ),
@@ -863,9 +898,8 @@ class _WarehouseCatalog extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         state.data.when(
-          loading: () => const _GlassCard(
-            child: _EmptyNote('Loading products...'),
-          ),
+          loading: () =>
+              const _GlassCard(child: _EmptyNote('Loading products...')),
           error: (e, _) => _ErrorView(message: e.toString(), onRetry: onRetry),
           data: (page) {
             if (page.products.isEmpty) {
@@ -888,10 +922,8 @@ class _WarehouseCatalog extends StatelessWidget {
                       onStockIn: () => onStockIn(p),
                       onTransfer: () => onTransfer(p),
                     ),
-                    if (p != page.products.last) const Divider(
-                      height: 1,
-                      color: Colors.white24,
-                    ),
+                    if (p != page.products.last)
+                      const Divider(height: 1, color: Colors.white24),
                   ],
                 ],
               ),
@@ -931,7 +963,9 @@ class _WarehouseProductTile extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ProductThumb(image: product.images.isEmpty ? '' : product.images.first),
+                _ProductThumb(
+                  image: product.images.isEmpty ? '' : product.images.first,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -963,7 +997,11 @@ class _WarehouseProductTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StockPill(quantity: product.quantity, low: lowStock, unit: _stockUnit(product)),
+                _StockPill(
+                  quantity: product.quantity,
+                  low: lowStock,
+                  unit: _stockUnit(product),
+                ),
               ],
             ),
             if (colors.isNotEmpty) ...[
@@ -983,9 +1021,17 @@ class _WarehouseProductTile extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                _RoundAction(icon: Icons.add_box_rounded, tooltip: 'Stock In', onTap: onStockIn),
+                _RoundAction(
+                  icon: Icons.add_box_rounded,
+                  tooltip: 'Stock In',
+                  onTap: onStockIn,
+                ),
                 const SizedBox(width: 8),
-                _RoundAction(icon: Icons.swap_horiz_rounded, tooltip: 'Transfer', onTap: onTransfer),
+                _RoundAction(
+                  icon: Icons.swap_horiz_rounded,
+                  tooltip: 'Transfer',
+                  onTap: onTransfer,
+                ),
               ],
             ),
           ],
@@ -999,7 +1045,11 @@ class _WarehouseProductTile extends StatelessWidget {
 }
 
 class _RoundAction extends StatelessWidget {
-  const _RoundAction({required this.icon, required this.tooltip, required this.onTap});
+  const _RoundAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String tooltip;
@@ -1036,30 +1086,91 @@ class _ProductThumb extends StatelessWidget {
   static const double _size = 52;
 
   static final Uint8List _transparentPixel = Uint8List.fromList([
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-    0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
-    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
-    0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x48,
+    0x44,
+    0x52,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x08,
+    0x06,
+    0x00,
+    0x00,
+    0x00,
+    0x1F,
+    0x15,
+    0xC4,
+    0x89,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x44,
+    0x41,
+    0x54,
+    0x78,
+    0x9C,
+    0x62,
+    0x00,
+    0x01,
+    0x00,
+    0x00,
+    0x05,
+    0x00,
+    0x01,
+    0x0D,
+    0x0A,
+    0x2D,
+    0xB4,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x49,
+    0x45,
+    0x4E,
+    0x44,
+    0xAE,
+    0x42,
+    0x60,
+    0x82,
   ]);
 
   @override
   Widget build(BuildContext context) {
     Widget fallback() => Container(
-          width: _size,
-          height: _size,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _gold.withValues(alpha: 0.3)),
-          ),
-          child: Icon(
-            Icons.chair_outlined,
-            color: _gold.withValues(alpha: 0.7),
-            size: _size * 0.46,
-          ),
-        );
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _gold.withValues(alpha: 0.3)),
+      ),
+      child: Icon(
+        Icons.chair_outlined,
+        color: _gold.withValues(alpha: 0.7),
+        size: _size * 0.46,
+      ),
+    );
 
     if (image.isEmpty) return fallback();
     ImageProvider provider;
@@ -1170,7 +1281,9 @@ class _LowStockRow extends StatelessWidget {
                     value: pct,
                     minHeight: 4,
                     backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation(AppColors.premiumRedLight),
+                    valueColor: const AlwaysStoppedAnimation(
+                      AppColors.premiumRedLight,
+                    ),
                   ),
                 ),
               ],
@@ -1200,26 +1313,26 @@ class _RecentMoves extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(inventoryHistoryControllerProvider);
     return state.data.when(
-      loading: () => const _GlassCard(
-        child: _EmptyNote('Loading movements...'),
-      ),
+      loading: () =>
+          const _GlassCard(child: _EmptyNote('Loading movements...')),
       error: (e, _) => _ErrorView(
         message: e.toString(),
-        onRetry: () => ref.read(inventoryHistoryControllerProvider.notifier).refresh(),
+        onRetry: () =>
+            ref.read(inventoryHistoryControllerProvider.notifier).refresh(),
       ),
       data: (result) {
         final logs = result.logs;
         if (logs.isEmpty) {
           return const _GlassCard(
-            child: _EmptyNote('No movements yet — stock in and transfers will appear here.'),
+            child: _EmptyNote(
+              'No movements yet — stock in and transfers will appear here.',
+            ),
           );
         }
         return _GlassCard(
           padding: const EdgeInsets.all(14),
           child: Column(
-            children: [
-              for (final log in logs.take(6)) _MovementTile(log: log),
-            ],
+            children: [for (final log in logs.take(6)) _MovementTile(log: log)],
           ),
         );
       },
@@ -1431,7 +1544,11 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _AnimatedNumber extends StatelessWidget {
-  const _AnimatedNumber({required this.value, required this.style, this.currency = true});
+  const _AnimatedNumber({
+    required this.value,
+    required this.style,
+    this.currency = true,
+  });
 
   final num value;
   final TextStyle style;
@@ -1509,10 +1626,7 @@ class _LoadingView extends StatelessWidget {
           const SizedBox(
             width: 34,
             height: 34,
-            child: CircularProgressIndicator(
-              color: _gold,
-              strokeWidth: 2.5,
-            ),
+            child: CircularProgressIndicator(color: _gold, strokeWidth: 2.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1567,7 +1681,10 @@ class _ErrorView extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: _goldLight,
                 side: const BorderSide(color: _gold),
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 10,
+                ),
               ),
               icon: const Icon(Icons.refresh, size: 17),
               label: Text(
@@ -1772,6 +1889,10 @@ String _typeLabel(String t) {
       return 'Meter';
     case 'foam':
       return 'Foam';
+    case 'foam_cover':
+      return 'Foam Cover';
+    case 'pillow_cover':
+      return 'Pillow Cover';
     case 'pillow':
       return 'Pillow';
     default:
@@ -1780,6 +1901,9 @@ String _typeLabel(String t) {
 }
 
 String _stockUnit(Product p) {
+  if (p.usesVariants) {
+    return 'pcs';
+  }
   switch (p.productType) {
     case 'carpet':
       return 'sqft';
@@ -1795,6 +1919,19 @@ String _stockUnit(Product p) {
 }
 
 String _typeDetail(Product p) {
+  if (p.usesVariants) {
+    final colors = p.variants
+        .map((v) => v.color)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .length;
+    final sizes = p.variants
+        .map((v) => v.size)
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .length;
+    return '${p.variants.length} rows · $colors color${colors == 1 ? '' : 's'} · $sizes size${sizes == 1 ? '' : 's'}';
+  }
   switch (p.productType) {
     case 'carpet':
       if (p.carpetPiecesData.isNotEmpty) {
@@ -1813,7 +1950,9 @@ String _typeDetail(Product p) {
       }
       return '${p.quantity} pcs';
     case 'pillow':
-      return p.pillowSize.isNotEmpty ? '${p.pillowSize} · ${p.quantity} pcs' : '${p.quantity} pcs';
+      return p.pillowSize.isNotEmpty
+          ? '${p.pillowSize} · ${p.quantity} pcs'
+          : '${p.quantity} pcs';
     case 'qaleen':
       if (p.qaleenSizes.isNotEmpty) {
         final total = p.qaleenSizes.fold(0, (sum, s) => sum + s.pieces);

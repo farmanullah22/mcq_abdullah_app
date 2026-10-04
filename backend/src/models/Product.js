@@ -34,6 +34,15 @@ const sizeStockSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const variantSchema = new mongoose.Schema(
+  {
+    color: { type: String, default: '', trim: true },
+    size: { type: String, default: '', trim: true },
+    quantity: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -42,7 +51,7 @@ const productSchema = new mongoose.Schema(
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     brand: { type: String, default: '' },
     supplier: { type: String, default: '' },
-    productType: { type: String, enum: ['carpet', 'qaleen', 'meter', 'foam', 'pillow'], default: 'qaleen' },
+    productType: { type: String, enum: ['carpet', 'qaleen', 'meter', 'foam', 'pillow', 'foam_cover', 'pillow_cover'], default: 'qaleen' },
 
     carpetWidth: { type: Number, default: 0 },
     carpetHeight: { type: Number, default: 0 },
@@ -59,6 +68,7 @@ const productSchema = new mongoose.Schema(
     foamLength: { type: Number, default: 0 },
     foamWidth: { type: Number, default: 0 },
     foamThickness: { type: Number, default: 0 },
+    foamType: { type: String, default: '', trim: true },
     pillowSize: { type: String, default: '' },
     sizeStocks: { type: [sizeStockSchema], default: [] },
     pillowStock: { type: Number, default: 0, min: 0 },
@@ -73,6 +83,7 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     images: { type: [String], default: [] },
     colorStocks: { type: [colorStockSchema], default: [] },
+    variants: { type: [variantSchema], default: [] },
     shop: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', required: true },
     isDeleted: { type: Boolean, default: false },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

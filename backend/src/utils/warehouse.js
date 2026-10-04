@@ -54,6 +54,7 @@ const ensureWarehouseCopy = async (source, warehouse) => {
     foamLength: source.foamLength || 0,
     foamWidth: source.foamWidth || 0,
     foamThickness: source.foamThickness || 0,
+    foamType: source.foamType || '',
     pillowSize: source.pillowSize || '',
     sizeStocks: [],
     pillowStock: 0,

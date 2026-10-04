@@ -8,6 +8,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const { recordAudit } = require('../middleware/auth');
 const { getWarehouseShop } = require('../utils/warehouse');
+const { hasVariants, drainVariants, isVariantType, variantTotal, mergeVariants } = require('../utils/variants');
 
 const generateInvoiceNo = async () => {
   const date = new Date();
@@ -79,6 +80,7 @@ const createSale = asyncHandler(async (req, res) => {
 
   const saleItems = [];
   const inventoryLogs = [];
+  const touchedProducts = [];
   let subtotal = 0;
   let profit = 0;
 
@@ -97,7 +99,11 @@ const createSale = asyncHandler(async (req, res) => {
     if (!unitPrice || unitPrice < 0) throw new ApiError(400, 'Unit price must be positive.');
     const beforeQty = product.quantity;
 
-    if (product.productType === 'foam') {
+    // Legacy "3-in-1" foam sale: quantity split across foam / pillows / covers
+    // in one product. The re-designed products sell plain pieces at a manually
+    // typed price, so they skip this branch and use the generic quantity path.
+    if (product.productType === 'foam' &&
+        ((Number(item.foamQty) || 0) + (Number(item.pillowQty) || 0) + (Number(item.coverQty) || 0)) > 0) {
       const foamQty = Math.floor(Number(item.foamQty) || 0);
       const pillowQty = Math.floor(Number(item.pillowQty) || 0);
       const coverQty = Math.floor(Number(item.coverQty) || 0);
@@ -130,7 +136,7 @@ const createSale = asyncHandler(async (req, res) => {
           if (remaining <= 0) break;
         }
       }
-      await product.save();
+      touchedProducts.push(product);
 
       const totalQty = foamQty + pillowQty + coverQty;
       const itemTotal = totalQty * unitPrice;
@@ -158,6 +164,7 @@ const createSale = asyncHandler(async (req, res) => {
         newStock: product.quantity,
         quantity: totalQty,
         reason: `Sale ${invoiceNo}`,
+        performedBy: req.user._id,
         notes: `foam ${foamQty}, pillows ${pillowQty}, covers ${coverQty}`,
       });
       continue;
@@ -166,8 +173,9 @@ const createSale = asyncHandler(async (req, res) => {
     const qty = Number(item.quantity);
     if (!qty || qty <= 0) throw new ApiError(400, 'Quantity must be positive.');
 
-    let removedCarpetPiece = null;
-    let lengthSold = 0;
+  let removedCarpetPiece = null;
+  let lengthSold = 0;
+  let soldVariants = [];
 
     if (product.productType === 'carpet') {
       const soldW = Number(item.width) || 0;
@@ -196,6 +204,17 @@ const createSale = asyncHandler(async (req, res) => {
           throw new ApiError(400, `Insufficient carpet stock for "${product.name}" (only ${product.quantity} sqft left).`);
         }
         product.quantity = Number(product.quantity || 0) - area;
+      } else if (hasVariants(product)) {
+        if (variantTotal(product.variants) + 1e-9 < qty) {
+          throw new ApiError(
+            400,
+            `Insufficient stock for "${product.name}" (only ${variantTotal(product.variants)} pieces left).`
+          );
+        }
+        const drained = drainVariants(product.variants, qty);
+        product.variants = drained.variants;
+        product.quantity = variantTotal(product.variants);
+        soldVariants = drained.moved;
       } else if (product.quantity + 1e-9 < qty) {
         throw new ApiError(400, `Insufficient carpet stock for "${product.name}" (only ${product.quantity} sqft left).`);
       } else {
@@ -227,6 +246,17 @@ const createSale = asyncHandler(async (req, res) => {
       }
       product.qaleenSizes = sizes.filter((s) => (Number(s.pieces) || 0) > 0);
       product.quantity = Math.max(0, Number(product.quantity || 0) - qty);
+    } else if (hasVariants(product)) {
+      if (variantTotal(product.variants) + 1e-9 < qty) {
+        throw new ApiError(
+          400,
+          `Insufficient stock for "${product.name}" (only ${variantTotal(product.variants)} pieces left).`
+        );
+      }
+      const drained = drainVariants(product.variants, qty);
+      product.variants = drained.variants;
+      product.quantity = variantTotal(product.variants);
+      soldVariants = drained.moved;
     } else {
       if (product.quantity + 1e-9 < qty) {
         throw new ApiError(400, `Insufficient stock for "${product.name}" (only ${product.quantity} left).`);
@@ -234,7 +264,10 @@ const createSale = asyncHandler(async (req, res) => {
       product.quantity -= qty;
     }
 
-    await product.save();
+    // Product documents are only written once every item (and the discount)
+    // validated, so a rejected sale can never leave stock deducted without a
+    // matching sale record.
+    touchedProducts.push(product);
 
     const itemTotal = qty * unitPrice;
     saleItems.push({
@@ -256,6 +289,7 @@ const createSale = asyncHandler(async (req, res) => {
             image: removedCarpetPiece.image || '',
           }
         : null,
+      variants: soldVariants,
       length: lengthSold,
     });
     subtotal += itemTotal;
@@ -269,6 +303,7 @@ const createSale = asyncHandler(async (req, res) => {
       newStock: product.quantity,
       quantity: qty,
       reason: `Sale ${invoiceNo}`,
+      performedBy: req.user._id,
       notes:
         product.productType === 'carpet' && removedCarpetPiece
           ? `Sold piece ${removedCarpetPiece.width}m x ${removedCarpetPiece.height}m`
@@ -282,6 +317,11 @@ const createSale = asyncHandler(async (req, res) => {
   const totalAmount = subtotal - discountValue;
   const paidValue = Math.min(Math.max(Number(paidAmount) || 0, 0), totalAmount);
   const dueValue = totalAmount - paidValue;
+
+  // Everything validated: now deduct the stock and write the sale.
+  for (const p of touchedProducts) {
+    await p.save();
+  }
 
   const sale = await Sale.create({
     invoiceNo,
@@ -420,6 +460,10 @@ const deleteSale = asyncHandler(async (req, res) => {
         product.quantity += item.foamQty || 0;
         product.pillowStock += item.pillowQty || 0;
         product.coverStock += item.coverQty || 0;
+      } else if (Array.isArray(item.variants) && item.variants.length > 0) {
+        // Return the pieces to the same colour and size rows they came from.
+        product.variants = mergeVariants(product.variants, item.variants);
+        product.quantity = variantTotal(product.variants);
       } else if (item.carpetPiece) {
         if (Array.isArray(product.carpetPiecesData)) {
           product.carpetPiecesData.push(item.carpetPiece);
@@ -442,6 +486,7 @@ const deleteSale = asyncHandler(async (req, res) => {
         newStock: product.quantity,
         quantity: item.quantity,
         reason: `Sale ${sale.invoiceNo} reversed`,
+        performedBy: req.user._id,
         notes: item.carpetPiece ? 'Returned carpet piece to stock' : '',
       });
     }

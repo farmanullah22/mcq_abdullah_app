@@ -86,6 +86,27 @@ class CarpetPieceData {
       };
 }
 
+class ProductVariant {
+  final String color;
+  final String size;
+  final int quantity;
+
+  const ProductVariant({this.color = '', this.size = '', this.quantity = 0});
+
+  factory ProductVariant.fromJson(Map<String, dynamic> json) => ProductVariant(
+        color: json['color']?.toString() ?? '',
+        size: json['size']?.toString() ?? '',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {'color': color, 'size': size, 'quantity': quantity};
+
+  String get label {
+    if (color.isNotEmpty && size.isNotEmpty) return '$color / $size';
+    return color.isNotEmpty ? color : size;
+  }
+}
+
 class Product {
   final String id;
   final String name;
@@ -108,6 +129,7 @@ class Product {
   final double foamLength;
   final double foamWidth;
   final double foamThickness;
+  final String foamType;
   final String pillowSize;
   final List<SizeStock> sizeStocks;
   final int pillowStock;
@@ -121,6 +143,7 @@ class Product {
   final String description;
   final List<String> images;
   final List<ColorStock> colorStocks;
+  final List<ProductVariant> variants;
   final String? shopId;
   final String? shopName;
   final DateTime? createdAt;
@@ -148,6 +171,7 @@ class Product {
     this.foamLength = 0,
     this.foamWidth = 0,
     this.foamThickness = 0,
+    this.foamType = '',
     this.pillowSize = '',
     this.sizeStocks = const [],
     this.pillowStock = 0,
@@ -161,6 +185,7 @@ class Product {
     this.description = '',
     this.images = const [],
     this.colorStocks = const [],
+    this.variants = const [],
     this.shopId,
     this.shopName,
     this.createdAt,
@@ -170,6 +195,36 @@ class Product {
   bool get isLowStock => quantity <= lowStockThreshold;
 
   double get stockValue => quantity * costPrice;
+
+  /// Old carpets are tracked piece-by-piece (width x height -> area). The
+  /// re-designed carpet is a colour x quantity product.
+  bool get isLegacyCarpet => productType == 'carpet' && (carpetPiecesData.isNotEmpty || carpetWidth > 0);
+
+  /// Foam Cover, Pillow Cover and the new Carpet are stocked through colour
+  /// rows and priced per piece. Foam carries a foam type and one plain quantity.
+  bool get usesVariants =>
+      productType == 'foam_cover' || productType == 'pillow_cover' || (productType == 'carpet' && !isLegacyCarpet);
+
+  String get typeLabel {
+    switch (productType) {
+      case 'carpet':
+        return 'Carpet';
+      case 'foam':
+        return 'Foam';
+      case 'foam_cover':
+        return 'Foam Cover';
+      case 'pillow_cover':
+        return 'Pillow Cover';
+      case 'qaleen':
+        return 'Qaleen';
+      case 'meter':
+        return 'Meter';
+      case 'pillow':
+        return 'Pillow';
+      default:
+        return 'Product';
+    }
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
     final category = json['category'];
@@ -219,6 +274,7 @@ class Product {
       foamLength: (json['foamLength'] as num?)?.toDouble() ?? 0,
       foamWidth: (json['foamWidth'] as num?)?.toDouble() ?? 0,
       foamThickness: (json['foamThickness'] as num?)?.toDouble() ?? 0,
+      foamType: json['foamType']?.toString() ?? '',
       pillowSize: json['pillowSize']?.toString() ?? '',
       sizeStocks: (json['sizeStocks'] as List?)
               ?.map((e) => SizeStock.fromJson(e as Map<String, dynamic>))
@@ -236,6 +292,10 @@ class Product {
       images: (json['images'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       colorStocks: (json['colorStocks'] as List?)
               ?.map((e) => ColorStock.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      variants: (json['variants'] as List?)
+              ?.map((e) => ProductVariant.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           const [],
       shopId: sId,
@@ -277,5 +337,6 @@ class Product {
         'description': description,
         'images': images,
         'colorStocks': colorStocks.map((c) => c.toJson()).toList(),
+        'variants': variants.map((v) => v.toJson()).toList(),
       };
 }

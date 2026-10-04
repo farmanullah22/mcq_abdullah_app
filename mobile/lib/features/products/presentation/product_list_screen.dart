@@ -32,7 +32,8 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(productListControllerProvider);
-    final categories = ref.watch(categoryListControllerProvider).data.value ?? const [];
+    final categories =
+        ref.watch(categoryListControllerProvider).data.value ?? const [];
     final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
     return Scaffold(
@@ -41,9 +42,13 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
         actions: [
           IconButton(
             tooltip: 'Low stock only',
-            onPressed: () => ref.read(productListControllerProvider.notifier).setLowStockOnly(!state.lowStockOnly),
+            onPressed: () => ref
+                .read(productListControllerProvider.notifier)
+                .setLowStockOnly(!state.lowStockOnly),
             icon: Icon(
-              state.lowStockOnly ? Icons.warning_amber : Icons.warning_amber_outlined,
+              state.lowStockOnly
+                  ? Icons.warning_amber
+                  : Icons.warning_amber_outlined,
               color: state.lowStockOnly ? AppColors.danger : null,
             ),
           ),
@@ -61,7 +66,8 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
               controller: _searchController,
-              onChanged: (v) => ref.read(productListControllerProvider.notifier).setSearch(v),
+              onChanged: (v) =>
+                  ref.read(productListControllerProvider.notifier).setSearch(v),
               decoration: InputDecoration(
                 hintText: 'Search by name, SKU or barcode...',
                 prefixIcon: const Icon(Icons.search),
@@ -70,7 +76,9 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          ref.read(productListControllerProvider.notifier).setSearch('');
+                          ref
+                              .read(productListControllerProvider.notifier)
+                              .setSearch('');
                         },
                       )
                     : null,
@@ -88,17 +96,23 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                   child: FilterChip(
                     label: const Text('All'),
                     selected: state.categoryId == null,
-                    onSelected: (_) => ref.read(productListControllerProvider.notifier).setCategory(null),
+                    onSelected: (_) => ref
+                        .read(productListControllerProvider.notifier)
+                        .setCategory(null),
                   ),
                 ),
-                ...categories.map((c) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(c.name),
-                        selected: state.categoryId == c.id,
-                        onSelected: (_) => ref.read(productListControllerProvider.notifier).setCategory(c.id),
-                      ),
-                    )),
+                ...categories.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(c.name),
+                      selected: state.categoryId == c.id,
+                      onSelected: (_) => ref
+                          .read(productListControllerProvider.notifier)
+                          .setCategory(c.id),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -107,19 +121,28 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
               loading: () => const LoadingView(),
               error: (e, st) => ErrorView(
                 message: e.toString(),
-                onRetry: () => ref.read(productListControllerProvider.notifier).refresh(),
+                onRetry: () =>
+                    ref.read(productListControllerProvider.notifier).refresh(),
               ),
               data: (page) {
                 if (page.products.isEmpty) {
                   return EmptyState(
                     icon: Icons.inventory_2_outlined,
-                    title: state.lowStockOnly ? 'No low stock products' : 'No products found',
-                    subtitle: state.lowStockOnly ? 'All products are well stocked.' : 'Add your first product to get started.',
-                    action: state.lowStockOnly || isAdmin ? null : () => _openForm(context),
+                    title: state.lowStockOnly
+                        ? 'No low stock products'
+                        : 'No products found',
+                    subtitle: state.lowStockOnly
+                        ? 'All products are well stocked.'
+                        : 'Add your first product to get started.',
+                    action: state.lowStockOnly || isAdmin
+                        ? null
+                        : () => _openForm(context),
                   );
                 }
                 return RefreshIndicator(
-                  onRefresh: () => ref.read(productListControllerProvider.notifier).refresh(),
+                  onRefresh: () => ref
+                      .read(productListControllerProvider.notifier)
+                      .refresh(),
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     itemCount: page.products.length,
@@ -127,7 +150,9 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                       final product = page.products[index];
                       return _ProductCard(
                         product: product,
-                        onTap: isAdmin ? null : () => _openDetail(context, product: product),
+                        onTap: isAdmin
+                            ? null
+                            : () => _openDetail(context, product: product),
                         onEdit: () => _openForm(context, product: product),
                         onStockIn: () => _openStockIn(context, product),
                         onDelete: () => _confirmDelete(context, product),
@@ -166,9 +191,14 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Product'),
-        content: Text('Delete "${product.name}"? This will be recorded in the audit log and can be restored by the admin.'),
+        content: Text(
+          'Delete "${product.name}"? This will be recorded in the audit log and can be restored by the admin.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(ctx, true),
@@ -178,10 +208,17 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
       ),
     );
     if (confirmed != true) return;
-    final ok = await ref.read(productMutationControllerProvider.notifier).delete(product.id);
+    final ok = await ref
+        .read(productMutationControllerProvider.notifier)
+        .delete(product.id);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.read(productMutationControllerProvider).error ?? 'Delete failed')),
+        SnackBar(
+          content: Text(
+            ref.read(productMutationControllerProvider).error ??
+                'Delete failed',
+          ),
+        ),
       );
     }
   }
@@ -238,26 +275,49 @@ class _ProductCard extends StatelessWidget {
                             product.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(typeLabel, style: const TextStyle(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            typeLabel,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                         if (lowStock)
                           Container(
                             margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.danger.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Text('LOW', style: TextStyle(color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.w700)),
+                            child: const Text(
+                              'LOW',
+                              style: TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -277,26 +337,39 @@ class _ProductCard extends StatelessWidget {
                       _typeDetail(product),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Text(
                           'Cost ${Formatters.currency(product.costPrice)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            fontSize: 14,
+                          ),
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: lowStock ? AppColors.danger.withValues(alpha: 0.12) : AppColors.success.withValues(alpha: 0.12),
+                            color: lowStock
+                                ? AppColors.danger.withValues(alpha: 0.12)
+                                : AppColors.success.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             _stockLabel(product),
                             style: TextStyle(
-                              color: lowStock ? AppColors.danger : AppColors.success,
+                              color: lowStock
+                                  ? AppColors.danger
+                                  : AppColors.success,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -315,6 +388,19 @@ class _ProductCard extends StatelessWidget {
   }
 
   String _typeDetail(Product p) {
+    if (p.usesVariants) {
+      final colors = p.variants
+          .map((v) => v.color)
+          .where((c) => c.isNotEmpty)
+          .toSet()
+          .length;
+      final sizes = p.variants
+          .map((v) => v.size)
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .length;
+      return '${p.variants.length} rows | $colors color${colors == 1 ? '' : 's'} | $sizes size${sizes == 1 ? '' : 's'} | ${p.quantity} pcs';
+    }
     switch (p.productType) {
       case 'carpet':
         if (p.carpetPiecesData.isNotEmpty) {
@@ -353,6 +439,9 @@ class _ProductCard extends StatelessWidget {
   }
 
   String _stockLabel(Product p) {
+    if (p.usesVariants) {
+      return '${p.quantity} pcs';
+    }
     switch (p.productType) {
       case 'carpet':
         return '${p.quantity} sqft';
@@ -378,7 +467,10 @@ IconData _typeIcon(String t) {
       return Icons.straighten;
     case 'foam':
       return Icons.weekend_outlined;
+    case 'foam_cover':
+      return Icons.layers_outlined;
     case 'pillow':
+    case 'pillow_cover':
       return Icons.king_bed_outlined;
     default:
       return Icons.inventory_2_outlined;
@@ -393,6 +485,10 @@ String _typeLabel(String t) {
       return 'Meter';
     case 'foam':
       return 'Foam';
+    case 'foam_cover':
+      return 'Foam Cover';
+    case 'pillow_cover':
+      return 'Pillow Cover';
     case 'pillow':
       return 'Pillow';
     default:

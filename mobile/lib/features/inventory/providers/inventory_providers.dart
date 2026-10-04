@@ -9,7 +9,10 @@ class InventoryHistoryState {
   final AsyncValue<({List<InventoryLog> logs, int total})> data;
   final String? actionType;
 
-  const InventoryHistoryState({this.data = const AsyncValue.loading(), this.actionType});
+  const InventoryHistoryState({
+    this.data = const AsyncValue.loading(),
+    this.actionType,
+  });
 }
 
 class InventoryHistoryController extends Notifier<InventoryHistoryState> {
@@ -24,10 +27,18 @@ class InventoryHistoryController extends Notifier<InventoryHistoryState> {
 
   Future<void> _load() async {
     try {
-      final result = await ref.read(inventoryRepositoryProvider).history(actionType: state.actionType);
-      state = InventoryHistoryState(data: AsyncValue.data(result), actionType: state.actionType);
+      final result = await ref
+          .read(inventoryRepositoryProvider)
+          .history(actionType: state.actionType);
+      state = InventoryHistoryState(
+        data: AsyncValue.data(result),
+        actionType: state.actionType,
+      );
     } catch (e, st) {
-      state = InventoryHistoryState(data: AsyncValue.error(e, st), actionType: state.actionType);
+      state = InventoryHistoryState(
+        data: AsyncValue.error(e, st),
+        actionType: state.actionType,
+      );
     }
   }
 
@@ -40,7 +51,9 @@ class InventoryHistoryController extends Notifier<InventoryHistoryState> {
 }
 
 final inventoryHistoryControllerProvider =
-    NotifierProvider<InventoryHistoryController, InventoryHistoryState>(InventoryHistoryController.new);
+    NotifierProvider<InventoryHistoryController, InventoryHistoryState>(
+      InventoryHistoryController.new,
+    );
 
 class StockMutationState {
   final bool loading;
@@ -60,17 +73,21 @@ class StockMutationController extends Notifier<StockMutationState> {
     String notes = '',
     List<Map<String, dynamic>> carpetPieces = const [],
     List<Map<String, dynamic>> qaleenSizes = const [],
+    List<Map<String, dynamic>> variants = const [],
     double? length,
   }) async {
     state = const StockMutationState(loading: true);
     try {
-      await ref.read(inventoryRepositoryProvider).stockIn(
+      await ref
+          .read(inventoryRepositoryProvider)
+          .stockIn(
             productId: productId,
             quantity: quantity,
             supplier: supplier,
             notes: notes,
             carpetPieces: carpetPieces,
             qaleenSizes: qaleenSizes,
+            variants: variants,
             length: length,
           );
       state = const StockMutationState();
@@ -91,17 +108,21 @@ class StockMutationController extends Notifier<StockMutationState> {
     String notes = '',
     List<Map<String, dynamic>> carpetPieces = const [],
     List<Map<String, dynamic>> qaleenSizes = const [],
+    List<Map<String, dynamic>> variants = const [],
     double? length,
   }) async {
     state = const StockMutationState(loading: true);
     try {
-      await ref.read(inventoryRepositoryProvider).stockOut(
+      await ref
+          .read(inventoryRepositoryProvider)
+          .stockOut(
             productId: productId,
             quantity: quantity,
             reason: reason,
             notes: notes,
             carpetPieces: carpetPieces,
             qaleenSizes: qaleenSizes,
+            variants: variants,
             length: length,
           );
       state = const StockMutationState();
@@ -114,6 +135,7 @@ class StockMutationController extends Notifier<StockMutationState> {
       return false;
     }
   }
+
   Future<bool> transfer({
     required String fromShopId,
     required String toShopId,
@@ -122,11 +144,14 @@ class StockMutationController extends Notifier<StockMutationState> {
     String notes = '',
     List<Map<String, dynamic>> carpetPieces = const [],
     List<Map<String, dynamic>> qaleenSizes = const [],
+    List<Map<String, dynamic>> variants = const [],
     double? length,
   }) async {
     state = const StockMutationState(loading: true);
     try {
-      await ref.read(inventoryRepositoryProvider).transfer(
+      await ref
+          .read(inventoryRepositoryProvider)
+          .transfer(
             fromShopId: fromShopId,
             toShopId: toShopId,
             productId: productId,
@@ -134,6 +159,7 @@ class StockMutationController extends Notifier<StockMutationState> {
             notes: notes,
             carpetPieces: carpetPieces,
             qaleenSizes: qaleenSizes,
+            variants: variants,
             length: length,
           );
       state = const StockMutationState();
@@ -149,4 +175,6 @@ class StockMutationController extends Notifier<StockMutationState> {
 }
 
 final stockMutationControllerProvider =
-    NotifierProvider<StockMutationController, StockMutationState>(StockMutationController.new);
+    NotifierProvider<StockMutationController, StockMutationState>(
+      StockMutationController.new,
+    );
