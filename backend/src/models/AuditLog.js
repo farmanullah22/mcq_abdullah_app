@@ -20,6 +20,10 @@ const ACTION_TYPES = [
   'UPDATE_EXPENSE',
   'DELETE_EXPENSE',
   'RESTORE_EXPENSE',
+  'CREATE_KHATA',
+  'UPDATE_KHATA',
+  'DELETE_KHATA',
+  'RESTORE_KHATA',
   'CREATE_USER',
   'UPDATE_USER',
   'LOGIN',
@@ -37,6 +41,7 @@ const MODULES = [
   'shops',
   'users',
   'reports',
+  'khata',
   'system',
 ];
 

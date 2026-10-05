@@ -15,6 +15,8 @@ import '../../auth/providers/auth_providers.dart';
 import '../../categories/presentation/category_screen.dart';
 import '../../expenses/presentation/expense_form_screen.dart';
 import '../../inventory/presentation/stock_screens.dart';
+import '../../khata/presentation/khata_screen.dart';
+import '../../khata/providers/khata_providers.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../notifications/providers/notification_providers.dart';
 import '../../products/presentation/product_form_screen.dart';
@@ -121,6 +123,17 @@ class DashboardScreen extends ConsumerWidget {
             onOpen: () => _openShop(context, branch),
           ),
       ],
+      const SizedBox(height: 26),
+      const _SectionTitle(
+        title: 'My Khata',
+        subtitle: 'Money you gave or received, kept private to you',
+      ),
+      const SizedBox(height: 12),
+      _KhataCard(
+        onOpen: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const KhataScreen()),
+        ),
+      ),
     ];
   }
 
@@ -2089,6 +2102,149 @@ class _GlassCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Admin-only personal cash book. Rendered on the admin dashboard so the owner
+// can record money they handed out or took back without touching shop data.
+class _KhataCard extends ConsumerWidget {
+  const _KhataCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(khataListControllerProvider);
+    final totals = state.data.asData?.value.totals;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onOpen,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF16141B),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _gold.withValues(alpha: 0.28)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _gold.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _gold.withValues(alpha: 0.5)),
+                      ),
+                      child: const Icon(Icons.menu_book_outlined, size: 20, color: _goldLight),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Open Khata',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: _gold.withValues(alpha: 0.7)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (totals == null)
+                  Text(
+                    state.data.hasError
+                        ? 'Could not load your khata. Tap to retry.'
+                        : 'Loading your khata…',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    'Outstanding',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    Formatters.currency(totals.outstanding.abs()),
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: totals.outstanding > 0
+                          ? const Color(0xFFE38B8B)
+                          : const Color(0xFF7FD1A0),
+                    ),
+                  ),
+                  Text(
+                    totals.outstanding > 0 ? 'you are out of pocket' : 'in your favour',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _KhataStat(
+                        label: 'Given',
+                        value: Formatters.currency(totals.given),
+                        color: const Color(0xFFE38B8B),
+                      ),
+                      const SizedBox(width: 22),
+                      _KhataStat(
+                        label: 'Received',
+                        value: Formatters.currency(totals.received),
+                        color: const Color(0xFF7FD1A0),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KhataStat extends StatelessWidget {
+  const _KhataStat({required this.label, required this.value, required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.45)),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+        ),
+      ],
     );
   }
 }

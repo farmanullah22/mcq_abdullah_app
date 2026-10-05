@@ -9,6 +9,7 @@ import '../../features/customers/data/customer_repository.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/expenses/data/expense_repository.dart';
 import '../../features/inventory/data/inventory_repository.dart';
+import '../../features/khata/data/khata_repository.dart';
 import '../../features/notifications/data/notification_repository.dart';
 import '../../features/products/data/product_repository.dart';
 import '../../features/reports/data/report_repository.dart';
@@ -30,3 +31,4 @@ final auditRepositoryProvider = Provider<AuditRepository>((ref) => AuditReposito
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) => NotificationRepository(ref.watch(apiClientProvider)));
 final customerRepositoryProvider = Provider<CustomerRepository>((ref) => CustomerRepository(ref.watch(apiClientProvider)));
 final supplierRepositoryProvider = Provider<SupplierRepository>((ref) => SupplierRepository(ref.watch(apiClientProvider)));
+final khataRepositoryProvider = Provider<KhataRepository>((ref) => KhataRepository(ref.watch(apiClientProvider)));

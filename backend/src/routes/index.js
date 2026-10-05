@@ -16,6 +16,7 @@ const reportRoutes = require('./reportRoutes');
 const analyticsRoutes = require('./analyticsRoutes');
 const auditRoutes = require('./auditRoutes');
 const notificationRoutes = require('./notificationRoutes');
+const khataRoutes = require('./khataRoutes');
 const { notFound } = require('../middleware/errorHandler');
 
 router.get('/health', (req, res) =>
@@ -37,6 +38,7 @@ router.use('/reports', protect, reportRoutes);
 router.use('/analytics', protect, analyticsRoutes);
 router.use('/audit', protect, auditRoutes);
 router.use('/notifications', protect, notificationRoutes);
+router.use('/khata', protect, khataRoutes);
 
 router.use(notFound);
 
