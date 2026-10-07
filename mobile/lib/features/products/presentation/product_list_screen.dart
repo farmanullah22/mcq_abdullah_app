@@ -6,7 +6,6 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
 import '../../categories/providers/category_providers.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../../inventory/presentation/stock_screens.dart';
 import '../models/product.dart';
 import '../providers/product_providers.dart';
@@ -34,7 +33,6 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     final state = ref.watch(productListControllerProvider);
     final categories =
         ref.watch(categoryListControllerProvider).data.value ?? const [];
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,12 +50,11 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
               color: state.lowStockOnly ? AppColors.danger : null,
             ),
           ),
-          if (!isAdmin)
-            IconButton(
-              tooltip: 'Add Product',
-              onPressed: () => _openForm(context),
-              icon: const Icon(Icons.add),
-            ),
+          IconButton(
+            tooltip: 'Add Product',
+            onPressed: () => _openForm(context),
+            icon: const Icon(Icons.add),
+          ),
         ],
       ),
       body: Column(
@@ -134,7 +131,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                     subtitle: state.lowStockOnly
                         ? 'All products are well stocked.'
                         : 'Add your first product to get started.',
-                    action: state.lowStockOnly || isAdmin
+                    action: state.lowStockOnly
                         ? null
                         : () => _openForm(context),
                   );
@@ -150,9 +147,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                       final product = page.products[index];
                       return _ProductCard(
                         product: product,
-                        onTap: isAdmin
-                            ? null
-                            : () => _openDetail(context, product: product),
+                        onTap: () => _openDetail(context, product: product),
                         onEdit: () => _openForm(context, product: product),
                         onStockIn: () => _openStockIn(context, product),
                         onDelete: () => _confirmDelete(context, product),

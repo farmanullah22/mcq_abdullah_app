@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../models/customer.dart';
 import '../providers/customer_providers.dart';
 import 'customer_detail_screen.dart';
@@ -32,8 +31,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = ref.watch(customerListControllerProvider);
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
-
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -155,21 +152,19 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           ],
         ),
       ),
-      floatingActionButton: isAdmin
-          ? null
-          : FloatingActionButton.extended(
-              heroTag: 'addCustomer',
-              backgroundColor: AppColors.gold,
-              foregroundColor: const Color(0xFF17151C),
-              icon: const Icon(Icons.person_add_alt_1, size: 20),
-              label: const Text('Add Customer'),
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
-                );
-                if (mounted) ref.read(customerListControllerProvider.notifier).refresh();
-              },
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addCustomer',
+        backgroundColor: AppColors.gold,
+        foregroundColor: const Color(0xFF17151C),
+        icon: const Icon(Icons.person_add_alt_1, size: 20),
+        label: const Text('Add Customer'),
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
+          );
+          if (mounted) ref.read(customerListControllerProvider.notifier).refresh();
+        },
+      ),
     );
   }
 }

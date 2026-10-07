@@ -129,8 +129,8 @@ class DashboardScreen extends ConsumerWidget {
       if (data.comparison.isNotEmpty) ...[
         const SizedBox(height: 26),
         const _SectionTitle(
-          title: 'Branches',
-          subtitle: 'Tap a branch to open its dashboard',
+          title: 'Branches & Warehouse',
+          subtitle: 'Tap a location to open its dashboard',
         ),
         const SizedBox(height: 12),
         for (final branch in data.comparison)
@@ -1566,6 +1566,7 @@ class _BranchSliderState extends State<_BranchSlider> {
                   revenue: branch.sales,
                   profit: branch.profit,
                   saleCount: branch.saleCount,
+                  isWarehouse: branch.isWarehouse,
                   onOpen: () => widget.onOpen(branch),
                 ),
               );
@@ -1608,6 +1609,7 @@ class _BranchCard extends StatelessWidget {
     required this.profit,
     required this.saleCount,
     this.manager,
+    this.isWarehouse = false,
     this.onOpen,
   });
 
@@ -1616,6 +1618,7 @@ class _BranchCard extends StatelessWidget {
   final double revenue;
   final double profit;
   final int saleCount;
+  final bool isWarehouse;
   final VoidCallback? onOpen;
 
   @override
@@ -1644,10 +1647,10 @@ class _BranchCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.storefront_rounded,
+                child: Icon(
+                  isWarehouse ? Icons.warehouse_rounded : Icons.storefront_rounded,
                   size: 18,
-                  color: Color(0xFF17151C),
+                  color: const Color(0xFF17151C),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1655,15 +1658,41 @@ class _BranchCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (isWarehouse) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4FC3F7).withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF4FC3F7).withValues(alpha: 0.6)),
+                            ),
+                            child: const Text(
+                              'WAREHOUSE',
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF4FC3F7),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (manager != null && manager!.isNotEmpty)
                       Text(
@@ -2009,10 +2038,10 @@ class _BranchQuickCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.storefront_rounded,
+                    child: Icon(
+                      branch.isWarehouse ? Icons.warehouse_rounded : Icons.storefront_rounded,
                       size: 22,
-                      color: Color(0xFF17151C),
+                      color: const Color(0xFF17151C),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -2020,15 +2049,41 @@ class _BranchQuickCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.playfairDisplay(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            if (branch.isWarehouse) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4FC3F7).withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF4FC3F7).withValues(alpha: 0.6)),
+                                ),
+                                child: const Text(
+                                  'WAREHOUSE',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: Color(0xFF4FC3F7),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         if (manager.isNotEmpty) ...[
                           const SizedBox(height: 3),

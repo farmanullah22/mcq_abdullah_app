@@ -5,10 +5,9 @@ const router = express.Router();
 
 router.get('/', scopedShop, expenseController.listExpenses);
 
-// Admin is view-only. Expense mutations are manager (operational) actions.
-router.post('/', restrictTo('manager'), expenseController.createExpense);
-router.put('/:id', restrictTo('manager'), expenseController.updateExpense);
-router.delete('/:id', restrictTo('manager'), expenseController.deleteExpense);
-router.post('/:id/restore', restrictTo('manager'), expenseController.restoreExpense);
+router.post('/', restrictTo('manager', 'admin'), expenseController.createExpense);
+router.put('/:id', restrictTo('manager', 'admin'), expenseController.updateExpense);
+router.delete('/:id', restrictTo('manager', 'admin'), expenseController.deleteExpense);
+router.post('/:id/restore', restrictTo('manager', 'admin'), expenseController.restoreExpense);
 
 module.exports = router;

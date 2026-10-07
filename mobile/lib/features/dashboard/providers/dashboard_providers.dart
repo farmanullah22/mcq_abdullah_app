@@ -7,7 +7,7 @@ import '../models/dashboard_data.dart';
 class DashboardState {
   final AsyncValue<DashboardData> data;
   final String? selectedShopId;
-  final List<({String id, String name})> shops;
+  final List<({String id, String name, String? shopType})> shops;
 
   const DashboardState({
     this.data = const AsyncValue.loading(),
@@ -18,7 +18,7 @@ class DashboardState {
   DashboardState copyWith({
     AsyncValue<DashboardData>? data,
     String? selectedShopId,
-    List<({String id, String name})>? shops,
+    List<({String id, String name, String? shopType})>? shops,
     bool clearShop = false,
   }) {
     return DashboardState(
@@ -48,7 +48,7 @@ class DashboardController extends Notifier<DashboardState> {
       shops: isAdmin
           ? const []
           : (user?.assignedShopId != null
-              ? [(id: user!.assignedShopId!, name: user.assignedShopName ?? 'My Shop')]
+              ? [(id: user!.assignedShopId!, name: user.assignedShopName ?? 'My Shop', shopType: user.assignedShopType)]
               : const []),
     );
   }
@@ -59,7 +59,7 @@ class DashboardController extends Notifier<DashboardState> {
     try {
       final shops = await ref.read(shopRepositoryProvider).getShops();
       state = state.copyWith(
-        shops: shops.map((s) => (id: s.id, name: s.name)).toList(),
+        shops: shops.map((s) => (id: s.id, name: s.name, shopType: s.shopType)).toList(),
       );
     } catch (_) {
       // shops load best-effort

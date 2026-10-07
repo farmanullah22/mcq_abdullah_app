@@ -2125,7 +2125,6 @@ class LowStockScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(productListControllerProvider.select((s) => s));
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
     return Scaffold(
       appBar: AppBar(title: const Text('Low Stock Alerts')),
       body: state.data.when(
@@ -2151,16 +2150,14 @@ class LowStockScreen extends ConsumerWidget {
                   subtitle: Text(
                     'Only ${_fmtNum(p.quantity.toDouble())} ${_unitFor(p.productType)} left (threshold ${p.lowStockThreshold})',
                   ),
-                  trailing: isAdmin
-                      ? null
-                      : TextButton(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => StockInScreen(productId: p.id),
-                            ),
-                          ),
-                          child: const Text('Restock'),
-                        ),
+                  trailing: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StockInScreen(productId: p.id),
+                      ),
+                    ),
+                    child: const Text('Restock'),
+                  ),
                 ),
               );
             },

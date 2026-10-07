@@ -141,7 +141,12 @@ class _ManagersScreenState extends ConsumerState<ManagersScreen> {
                   decoration: const InputDecoration(labelText: 'Assigned Shop'),
                   items: [
                     const DropdownMenuItem(value: null, child: Text('No shop')),
-                    ...shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
+                    ...shops.map(
+                      (s) => DropdownMenuItem(
+                        value: s.id,
+                        child: Text(s.isWarehouse ? '${s.name} (Warehouse)' : s.name),
+                      ),
+                    ),
                   ],
                   onChanged: (v) => shopId = v,
                 ),

@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../models/supplier.dart';
 import '../providers/supplier_providers.dart';
 import 'supplier_detail_screen.dart';
@@ -32,7 +31,6 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = ref.watch(supplierListControllerProvider);
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
     return Scaffold(
       body: SafeArea(
@@ -155,21 +153,19 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
           ],
         ),
       ),
-      floatingActionButton: isAdmin
-          ? null
-          : FloatingActionButton.extended(
-              heroTag: 'addSupplier',
-              backgroundColor: AppColors.gold,
-              foregroundColor: const Color(0xFF17151C),
-              icon: const Icon(Icons.add_business_outlined, size: 20),
-              label: const Text('Add Supplier'),
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SupplierFormScreen()),
-                );
-                if (mounted) ref.read(supplierListControllerProvider.notifier).refresh();
-              },
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addSupplier',
+        backgroundColor: AppColors.gold,
+        foregroundColor: const Color(0xFF17151C),
+        icon: const Icon(Icons.add_business_outlined, size: 20),
+        label: const Text('Add Supplier'),
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SupplierFormScreen()),
+          );
+          if (mounted) ref.read(supplierListControllerProvider.notifier).refresh();
+        },
+      ),
     );
   }
 }

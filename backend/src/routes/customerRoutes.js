@@ -6,11 +6,10 @@ const router = express.Router();
 router.get('/', scopedShop, customerController.listCustomers);
 router.get('/:id', customerController.getCustomer);
 
-// Customer records are manager (operational) actions; admin is view-only.
-router.post('/', restrictTo('manager'), customerController.createCustomer);
-router.put('/:id', restrictTo('manager'), customerController.updateCustomer);
-router.delete('/:id', restrictTo('manager'), customerController.deleteCustomer);
-router.post('/:id/restore', restrictTo('manager'), customerController.restoreCustomer);
-router.post('/:id/balance', restrictTo('manager'), customerController.adjustBalance);
+router.post('/', restrictTo('manager', 'admin'), customerController.createCustomer);
+router.put('/:id', restrictTo('manager', 'admin'), customerController.updateCustomer);
+router.delete('/:id', restrictTo('manager', 'admin'), customerController.deleteCustomer);
+router.post('/:id/restore', restrictTo('manager', 'admin'), customerController.restoreCustomer);
+router.post('/:id/balance', restrictTo('manager', 'admin'), customerController.adjustBalance);
 
 module.exports = router;

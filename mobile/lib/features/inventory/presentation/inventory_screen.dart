@@ -31,7 +31,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryHistoryControllerProvider);
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
     final isWarehouse = ref.watch(currentUserProvider)?.isWarehouseManager ?? false;
 
     return Scaffold(
@@ -67,9 +66,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         ],
       ),
-      // Admin is view-only: stock mutations are manager actions. The warehouse
-      // also cannot do direct stock out (stock leaves via transfer).
-      floatingActionButton: isAdmin || isWarehouse
+      // The warehouse cannot do direct stock out (stock leaves via transfer),
+      // so its manager keeps no stock-out button here; everyone else does.
+      floatingActionButton: isWarehouse
           ? null
           : FloatingActionButton.small(
               heroTag: 'stockOut',

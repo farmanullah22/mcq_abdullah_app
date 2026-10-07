@@ -134,6 +134,7 @@ const shopComparison = async (shops) => {
     out.push({
       shopId: shop._id,
       shopName: shop.name,
+      shopType: shop.shopType || 'branch',
       manager: shop.manager ? (shop.manager.name || shop.manager) : null,
       sales: sales.total,
       expenses: expenses.total,

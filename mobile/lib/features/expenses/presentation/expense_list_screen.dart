@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../models/expense.dart';
 import '../providers/expense_providers.dart';
 import 'expense_form_screen.dart';
@@ -17,7 +16,6 @@ class ExpenseListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(expenseListControllerProvider);
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -28,14 +26,13 @@ class ExpenseListScreen extends ConsumerWidget {
             onPressed: () => ref.read(expenseListControllerProvider.notifier).refresh(),
             icon: const Icon(Icons.refresh),
           ),
-          if (!isAdmin)
-            IconButton(
-              tooltip: 'Add Expense',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ExpenseFormScreen()),
-              ),
-              icon: const Icon(Icons.add),
+          IconButton(
+            tooltip: 'Add Expense',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ExpenseFormScreen()),
             ),
+            icon: const Icon(Icons.add),
+          ),
         ],
       ),
       body: state.data.when(
@@ -60,7 +57,7 @@ class ExpenseListScreen extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) => _ExpenseTile(
                 expense: page.expenses[index],
-                canDelete: !isAdmin,
+                canDelete: true,
                 onDelete: () => _confirmDelete(context, ref, page.expenses[index]),
               ),
             ),

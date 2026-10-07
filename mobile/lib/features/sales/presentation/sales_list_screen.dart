@@ -11,7 +11,6 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_bar_brand.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
-import '../../auth/providers/auth_providers.dart';
 import '../models/sale.dart';
 import '../providers/sale_providers.dart';
 import '../services/invoice_pdf.dart';
@@ -22,7 +21,6 @@ class SalesListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(saleListControllerProvider);
-    final isAdmin = ref.watch(currentUserProvider)?.isAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -82,7 +80,7 @@ class SalesListScreen extends ConsumerWidget {
                     itemBuilder: (context, index) => _SaleTile(
                       sale: page.sales[index],
                       onTap: () => _openDetail(context, ref, page.sales[index]),
-                      canDelete: !isAdmin,
+                      canDelete: true,
                       onDelete: () => _confirmDelete(context, ref, page.sales[index]),
                     ),
                   ),

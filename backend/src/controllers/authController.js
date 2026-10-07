@@ -233,7 +233,7 @@ const registerManager = asyncHandler(async (req, res) => {
 
 const listManagers = asyncHandler(async (req, res) => {
   const managers = await User.find({ role: 'manager' })
-    .populate('assignedShop', 'name address')
+    .populate('assignedShop', 'name address shopType')
     .select('-password')
     .sort({ createdAt: -1 });
   res.json(ApiResponse.ok('Managers fetched', managers));
@@ -255,7 +255,7 @@ const updateManager = asyncHandler(async (req, res) => {
     manager.email = email;
   }
   await manager.save();
-  await manager.populate('assignedShop', 'name address');
+  await manager.populate('assignedShop', 'name address shopType');
 
   await recordAudit(req, {
     actionType: 'UPDATE_USER',

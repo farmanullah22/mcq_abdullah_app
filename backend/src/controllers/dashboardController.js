@@ -58,9 +58,10 @@ const getDashboard = asyncHandler(async (req, res) => {
     buildTopCustomers(shopId, 5),
   ]);
 
-  // Only retail branches belong in the side-by-side comparison; the warehouse is
-  // a stock location, not a selling branch, so it would skew the ranking.
-  const comparison = await stats.shopComparison(shops.filter((s) => s.shopType === 'branch'));
+  // The warehouse sits alongside the branches in the side-by-side comparison
+  // so the owner can open and manage it exactly like any branch. It has no
+  // sales of its own, so its revenue simply reads zero.
+  const comparison = await stats.shopComparison(shops);
 
   // The warehouse is excluded from the branch ranking but must still be visible
   // to the owner, otherwise stock health disappears from the dashboard entirely.
@@ -149,7 +150,7 @@ const getDashboard = asyncHandler(async (req, res) => {
         subtitle: l.shopName || (l.performedByName || ''),
         time: l.timestamp,
       })),
-      shops: shops.map((s) => ({ id: s._id, name: s.name, manager: s.manager?.name || '—' })),
+      shops: shops.map((s) => ({ id: s._id, name: s.name, shopType: s.shopType || 'branch', manager: s.manager?.name || '—' })),
     })
   );
 });

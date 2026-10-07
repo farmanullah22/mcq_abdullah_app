@@ -25,6 +25,7 @@ class ChartPoint {
 class ShopComparison {
   final String shopId;
   final String? shopName;
+  final String? shopType; // 'warehouse' | 'branch'
   final String? manager;
   final double sales;
   final double expenses;
@@ -34,6 +35,7 @@ class ShopComparison {
   const ShopComparison({
     required this.shopId,
     this.shopName,
+    this.shopType,
     this.manager,
     this.sales = 0,
     this.expenses = 0,
@@ -41,9 +43,14 @@ class ShopComparison {
     this.saleCount = 0,
   });
 
+  bool get isWarehouse =>
+      shopType == 'warehouse' ||
+      RegExp(r'warehouse', caseSensitive: false).hasMatch(shopName ?? '');
+
   factory ShopComparison.fromJson(Map<String, dynamic> json) => ShopComparison(
         shopId: (json['shopId'] ?? json['shop'] ?? '').toString(),
         shopName: json['shopName']?.toString(),
+        shopType: json['shopType']?.toString(),
         manager: json['manager']?.toString(),
         sales: (json['sales'] as num?)?.toDouble() ?? 0,
         expenses: (json['expenses'] as num?)?.toDouble() ?? 0,
@@ -342,13 +349,19 @@ class DashboardData {
 class ShopSummary {
   final String id;
   final String name;
+  final String? shopType; // 'warehouse' | 'branch'
   final String manager;
 
-  const ShopSummary({required this.id, required this.name, this.manager = ''});
+  const ShopSummary({required this.id, required this.name, this.shopType, this.manager = ''});
+
+  bool get isWarehouse =>
+      shopType == 'warehouse' ||
+      RegExp(r'warehouse', caseSensitive: false).hasMatch(name);
 
   factory ShopSummary.fromJson(Map<String, dynamic> json) => ShopSummary(
         id: (json['id'] ?? json['_id']).toString(),
         name: json['name']?.toString() ?? '',
+        shopType: json['shopType']?.toString(),
         manager: json['manager']?.toString() ?? '',
       );
 }

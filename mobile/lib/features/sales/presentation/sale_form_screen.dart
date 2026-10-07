@@ -309,7 +309,8 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
                       value: null,
                       child: Text('All shops / main'),
                     ),
-                    ...dashboard.shops.map(
+                    // The warehouse is a stock location, not a selling shop.
+                    ...dashboard.shops.where((s) => s.shopType != 'warehouse').map(
                       (s) => DropdownMenuItem(value: s.id, child: Text(s.name)),
                     ),
                   ],

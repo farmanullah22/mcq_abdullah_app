@@ -6,7 +6,6 @@ import '../core/theme/app_colors.dart';
 import '../features/analytics/presentation/analytics_screen.dart';
 import '../features/audit/presentation/audit_logs_screen.dart';
 import '../features/audit/presentation/recent_activity_screen.dart';
-import '../features/auth/models/user.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../features/categories/presentation/category_screen.dart';
 import '../features/customers/presentation/customers_screen.dart';
@@ -33,13 +32,6 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   static const _routes = ['dashboard', 'sales', 'inventory', 'customers', 'suppliers'];
-
-  List<String> _routesFor(User? user) {
-    if ((user?.isWarehouseManager ?? false) == true) {
-      return const ['dashboard', 'inventory', 'suppliers'];
-    }
-    return _routes;
-  }
 
   int _index = 0;
   final Map<String, Widget> _cache = {};
@@ -73,7 +65,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final user = ref.watch(currentUserProvider);
     final isAdmin = user?.isAdmin ?? false;
     final isWarehouse = user?.isWarehouseManager ?? false;
-    final routes = _routesFor(user);
+    final routes = _routes;
     final index = _index < routes.length ? _index : routes.length - 1;
 
     return Stack(
@@ -170,11 +162,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
           const _DrawerSection('Navigation'),
           _DrawerItem(icon: Icons.dashboard_outlined, label: 'Dashboard', onTap: () => _go('dashboard')),
-          if (!isWarehouse)
-            _DrawerItem(icon: Icons.point_of_sale_outlined, label: 'Sales', onTap: () => _go('sales')),
+          _DrawerItem(icon: Icons.point_of_sale_outlined, label: 'Sales', onTap: () => _go('sales')),
           _DrawerItem(icon: Icons.inventory_2_outlined, label: 'Inventory', onTap: () => _go('inventory')),
-          if (!isWarehouse)
-            _DrawerItem(icon: Icons.people_outline, label: 'Customers', onTap: () => _go('customers')),
+          _DrawerItem(icon: Icons.people_outline, label: 'Customers', onTap: () => _go('customers')),
           _DrawerItem(icon: Icons.local_shipping_outlined, label: 'Suppliers', onTap: () => _go('suppliers')),
           const Divider(),
           const _DrawerSection('Modules'),
@@ -233,7 +223,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   void _go(String route) {
     Navigator.of(context).pop();
-    setState(() => _index = _routesFor(ref.read(currentUserProvider)).indexOf(route));
+    setState(() => _index = _routes.indexOf(route));
   }
 
   void _open(Widget screen) {

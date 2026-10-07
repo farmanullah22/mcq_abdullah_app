@@ -6,10 +6,9 @@ const router = express.Router();
 router.get('/', scopedShop, saleController.listSales);
 router.get('/:id', saleController.getSale);
 
-// Admin is view-only. Sale mutations are manager (operational) actions.
-router.post('/', restrictTo('manager'), saleController.createSale);
-router.put('/:id', restrictTo('manager'), saleController.updateSale);
-router.delete('/:id', restrictTo('manager'), saleController.deleteSale);
-router.post('/:id/restore', restrictTo('manager'), saleController.restoreSale);
+router.post('/', restrictTo('manager', 'admin'), saleController.createSale);
+router.put('/:id', restrictTo('manager', 'admin'), saleController.updateSale);
+router.delete('/:id', restrictTo('manager', 'admin'), saleController.deleteSale);
+router.post('/:id/restore', restrictTo('manager', 'admin'), saleController.restoreSale);
 
 module.exports = router;

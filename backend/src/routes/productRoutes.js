@@ -7,10 +7,9 @@ router.get('/', scopedShop, productController.listProducts);
 router.get('/low-stock', scopedShop, productController.lowStockProducts);
 router.get('/:id', productController.getProduct);
 
-// Admin is view-only. Product mutations are manager (operational) actions.
-router.post('/', restrictTo('manager'), productController.createProduct);
-router.put('/:id', restrictTo('manager'), productController.updateProduct);
-router.delete('/:id', restrictTo('manager'), productController.deleteProduct);
-router.post('/:id/restore', restrictTo('manager'), productController.restoreProduct);
+router.post('/', restrictTo('manager', 'admin'), productController.createProduct);
+router.put('/:id', restrictTo('manager', 'admin'), productController.updateProduct);
+router.delete('/:id', restrictTo('manager', 'admin'), productController.deleteProduct);
+router.post('/:id/restore', restrictTo('manager', 'admin'), productController.restoreProduct);
 
 module.exports = router;
