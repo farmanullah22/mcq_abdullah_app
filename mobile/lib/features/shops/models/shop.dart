@@ -1,6 +1,7 @@
 class Shop {
   final String id;
   final String name;
+  final String shopType;
   final String address;
   final String contactNumber;
   final String? managerId;
@@ -9,11 +10,14 @@ class Shop {
   const Shop({
     required this.id,
     required this.name,
+    this.shopType = 'branch',
     this.address = '',
     this.contactNumber = '',
     this.managerId,
     this.managerName,
   });
+
+  bool get isWarehouse => shopType == 'warehouse';
 
   factory Shop.fromJson(Map<String, dynamic> json) {
     final manager = json['manager'];
@@ -28,6 +32,7 @@ class Shop {
     return Shop(
       id: (json['id'] ?? json['_id']).toString(),
       name: json['name']?.toString() ?? '',
+      shopType: json['shopType']?.toString() ?? 'branch',
       address: json['address']?.toString() ?? '',
       contactNumber: json['contactNumber']?.toString() ?? '',
       managerId: mgrId,
@@ -37,6 +42,7 @@ class Shop {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+        'shopType': shopType,
         'address': address,
         'contactNumber': contactNumber,
         'manager': managerId,

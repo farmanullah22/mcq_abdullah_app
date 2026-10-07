@@ -22,6 +22,14 @@ const protect = asyncHandler(async (req, res, next) => {
   const user = await User.findById(decoded.id).populate('assignedShop');
   if (!user) throw new ApiError(401, 'User not found.');
   if (!user.isActive) throw new ApiError(403, 'Account has been deactivated.');
+  // A manager whose shop was deleted must not keep a working session: their
+  // assignedShop is soft-deleted, so every shop-scoped screen would read a
+  // deleted branch instead of failing clearly.
+  if (user.role === 'manager') {
+    if (!user.assignedShop || user.assignedShop.isDeleted) {
+      throw new ApiError(403, 'Your shop is no longer active. Contact the administrator.');
+    }
+  }
 
   req.user = user;
   req.deviceInfo = parseDeviceInfo(req);

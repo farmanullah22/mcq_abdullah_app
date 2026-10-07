@@ -58,7 +58,43 @@ const getDashboard = asyncHandler(async (req, res) => {
     buildTopCustomers(shopId, 5),
   ]);
 
-  const comparison = await stats.shopComparison(shops);
+  // Only retail branches belong in the side-by-side comparison; the warehouse is
+  // a stock location, not a selling branch, so it would skew the ranking.
+  const comparison = await stats.shopComparison(shops.filter((s) => s.shopType === 'branch'));
+
+  // The warehouse is excluded from the branch ranking but must still be visible
+  // to the owner, otherwise stock health disappears from the dashboard entirely.
+  const warehouseShops = shops.filter((s) => s.shopType === 'warehouse');
+  let warehouse = null;
+  if (warehouseShops.length > 0) {
+    const whIds = warehouseShops.map((s) => s._id);
+    const whFilter = { isDeleted: false, shop: { $in: whIds } };
+    const [whProductCount, whQtyAgg, whValueAgg, whLowAgg] = await Promise.all([
+      Product.countDocuments(whFilter),
+      Product.aggregate([{ $match: whFilter }, { $group: { _id: null, qty: { $sum: '$quantity' } } }]),
+      Product.aggregate([
+        { $match: whFilter },
+        { $group: { _id: null, value: { $sum: { $multiply: ['$quantity', '$costPrice'] } } } },
+      ]),
+      Product.aggregate([
+        { $match: whFilter },
+        { $match: { $expr: { $lte: ['$quantity', '$lowStockThreshold'] } } },
+        { $count: 'count' },
+      ]),
+    ]);
+    warehouse = {
+      shops: warehouseShops.map((s) => ({
+        id: s._id,
+        name: s.name,
+        manager: s.manager?.name || '—',
+        shopId: s._id.toString(),
+      })),
+      productCount: whProductCount,
+      totalQuantity: whQtyAgg[0]?.qty || 0,
+      stockValue: whValueAgg[0]?.value || 0,
+      lowStockCount: whLowAgg[0]?.count || 0,
+    };
+  }
 
   const expenseBreakdown = await stats.expenseBreakdown(shopId, 30);
 
@@ -96,6 +132,7 @@ const getDashboard = asyncHandler(async (req, res) => {
         yearlyExpenses: yearExpenses.total,
       },
       charts: { daily, weekly, monthly, yearly, comparison, expenseBreakdown },
+      warehouse,
       topProducts,
       topCustomers,
       lowStock: lowStock.map((p) => ({

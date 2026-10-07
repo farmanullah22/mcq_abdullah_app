@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Shop = require('../models/Shop');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
@@ -40,6 +41,9 @@ const login = asyncHandler(async (req, res) => {
   if (user.role === 'manager') {
     if (!user.assignedShop) {
       throw new ApiError(403, 'No shop is assigned to your account. Contact the admin.');
+    }
+    if (user.assignedShop.isDeleted) {
+      throw new ApiError(403, 'Your shop has been removed. Contact the admin.');
     }
     if (shopId && shopId.toString() !== user.assignedShop._id.toString()) {
       throw new ApiError(400, 'The selected shop does not match your assigned shop.');
@@ -206,6 +210,13 @@ const registerManager = asyncHandler(async (req, res) => {
     role: 'manager',
     assignedShop: assignedShop || null,
   });
+
+  // Keep Shop.manager and User.assignedShop in sync. Assigning a shop here must
+  // also stamp the back-link, otherwise Shop.manager stays null and deleting
+  // that shop cannot discover who was assigned to it.
+  if (assignedShop) {
+    await Shop.findByIdAndUpdate(assignedShop, { $set: { manager: user._id } });
+  }
 
   await recordAudit(req, {
     actionType: 'CREATE_USER',

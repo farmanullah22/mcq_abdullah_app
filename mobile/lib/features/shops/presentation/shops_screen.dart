@@ -67,6 +67,7 @@ class ShopsScreen extends ConsumerWidget {
   Future<void> _showForm(BuildContext context, WidgetRef ref, {Shop? shop}) async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: shop?.name ?? '');
+    String shopType = shop?.shopType ?? 'branch';
     final addressController = TextEditingController(text: shop?.address ?? '');
     final contactController = TextEditingController(text: shop?.contactNumber ?? '');
     String? managerId = shop?.managerId;
@@ -102,6 +103,16 @@ class ShopsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  initialValue: shopType,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'branch', child: Text('Branch (sell to customers)')),
+                    DropdownMenuItem(value: 'warehouse', child: Text('Warehouse (stock only)')),
+                  ],
+                  onChanged: (v) => shopType = v ?? 'branch',
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
                   initialValue: managerId,
                   decoration: const InputDecoration(labelText: 'Manager'),
                   items: [
@@ -121,6 +132,7 @@ class ShopsScreen extends ConsumerWidget {
               if (!formKey.currentState!.validate()) return;
               final data = <String, dynamic>{
                 'name': nameController.text.trim(),
+                'shopType': shopType,
                 'address': addressController.text.trim(),
                 'contactNumber': contactController.text.trim(),
                 'manager': managerId,
@@ -148,25 +160,89 @@ class ShopsScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Shop shop) async {
+    final hasManager = shop.managerId != null && shop.managerName != null;
+    var deactivateManager = false;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Shop'),
-        content: Text('Delete "${shop.name}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          icon: Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+          title: Text('Delete ${shop.name}?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This is a soft delete. Products, sales and inventory records are kept and '
+                'the ${shop.name} can be restored later.',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+              if (hasManager) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Assigned manager: ${shop.managerName}',
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'They will be unassigned so they cannot keep using a deleted shop.',
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                      CheckboxListTile(
+                        value: deactivateManager,
+                        onChanged: (v) => setState(() => deactivateManager = v ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'Also deactivate their account',
+                          style: Theme.of(ctx).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true) return;
     try {
-      await ref.read(shopRepositoryProvider).delete(shop.id);
+      await ref.read(shopRepositoryProvider).delete(
+            shop.id,
+            deactivateManager: hasManager && deactivateManager,
+          );
       ref.read(shopListControllerProvider.notifier).refresh();
+      if (context.mounted) {
+        final msg = hasManager && deactivateManager
+            ? '${shop.name} deleted. ${shop.managerName} was unassigned and deactivated.'
+            : hasManager
+                ? '${shop.name} deleted. ${shop.managerName} was unassigned.'
+                : '${shop.name} deleted.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
@@ -197,14 +273,46 @@ class _ShopTile extends StatelessWidget {
                 color: AppColors.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.storefront_outlined, color: AppColors.secondary),
+              child: Icon(
+              shop.isWarehouse ? Icons.inventory_2_outlined : Icons.storefront_outlined,
+              color: shop.isWarehouse ? AppColors.info : AppColors.secondary,
+            ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(shop.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          shop.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (shop.isWarehouse ? AppColors.info : AppColors.primary)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          shop.isWarehouse ? 'WAREHOUSE' : 'BRANCH',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                            color: shop.isWarehouse ? AppColors.info : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     [

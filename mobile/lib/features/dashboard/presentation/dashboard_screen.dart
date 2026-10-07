@@ -93,6 +93,22 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  // The warehouse is not a selling branch, so revenue/profit/saleCount are left
+  // null and ShopDetailScreen falls back to its own shop-scoped overview.
+  void _openWarehouse(BuildContext context, WarehouseSummary warehouse) {
+    final shop = warehouse.shops.isNotEmpty ? warehouse.shops.first : null;
+    if (shop == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ShopDetailScreen(
+          shopId: shop.id,
+          shopName: shop.name,
+          manager: shop.manager,
+        ),
+      ),
+    );
+  }
+
   void _openLowStock(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const LowStockScreen()),
@@ -122,6 +138,20 @@ class DashboardScreen extends ConsumerWidget {
             branch: branch,
             onOpen: () => _openShop(context, branch),
           ),
+      ],
+      if (data.warehouse != null) ...[
+        const SizedBox(height: 26),
+        _SectionTitle(
+          title: 'Warehouse',
+          subtitle: data.warehouse!.shops.map((s) => s.name).join(', '),
+          actionLabel: 'Open',
+          action: () => _openWarehouse(context, data.warehouse!),
+        ),
+        const SizedBox(height: 12),
+        _WarehouseQuickCard(
+          warehouse: data.warehouse!,
+          onOpen: () => _openWarehouse(context, data.warehouse!),
+        ),
       ],
       const SizedBox(height: 26),
       const _SectionTitle(
@@ -1806,6 +1836,137 @@ class _BranchMetric extends StatelessWidget {
 }
 
 // --------------------------------------------------------------- branch list --
+
+class _WarehouseQuickCard extends StatelessWidget {
+  const _WarehouseQuickCard({required this.warehouse, required this.onOpen});
+
+  final WarehouseSummary warehouse;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = warehouse;
+    final managers = w.shops.map((s) => s.manager).where((m) => m.isNotEmpty && m != '—').toSet().join(', ');
+    final metrics = <({IconData icon, String label, String value})>[
+      (icon: Icons.inventory_2_outlined, label: 'Products', value: '${w.productCount}'),
+      (
+        icon: Icons.layers_outlined,
+        label: 'Units',
+        value: Formatters.compact(w.totalQuantity)
+      ),
+      (
+        icon: Icons.low_priority_outlined,
+        label: 'Low stock',
+        value: '${w.lowStockCount}'
+      ),
+    ];
+
+    return _GlassCard(
+      padding: EdgeInsets.zero,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFC9A227), Color(0xFF8C6D1F), Color(0xFF5C4A1A)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            w.shops.map((s) => s.name).join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            managers.isEmpty ? 'Stock location · no manager assigned' : 'Manager: $managers',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    for (var i = 0; i < metrics.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(metrics[i].icon, size: 15, color: _goldLight),
+                              const SizedBox(height: 4),
+                              Text(
+                                metrics[i].value,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                              ),
+                              Text(
+                                metrics[i].label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.55)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.payments_outlined, size: 14, color: Colors.white.withValues(alpha: 0.55)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Stock value ${Formatters.compact(w.stockValue)}',
+                      style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.55)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _BranchQuickCard extends StatelessWidget {
   const _BranchQuickCard({required this.branch, required this.onOpen});

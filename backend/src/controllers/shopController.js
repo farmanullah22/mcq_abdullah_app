@@ -13,6 +13,9 @@ const { recordAudit } = require('../middleware/auth');
 
 const listShops = asyncHandler(async (req, res) => {
   if (req.user.role === 'manager') {
+    if (!req.user.assignedShop) {
+      throw new ApiError(403, 'No shop is assigned to your account. Contact the administrator.');
+    }
     const shop = await Shop.findById(req.user.assignedShop._id).populate('manager', 'name email phone');
     if (!shop || shop.isDeleted) throw new ApiError(404, 'Assigned shop not found.');
     return res.json(ApiResponse.ok('Shop fetched', [shop]));
@@ -26,7 +29,10 @@ const listShops = asyncHandler(async (req, res) => {
 const getShop = asyncHandler(async (req, res) => {
   const shop = await Shop.findById(req.params.id).populate('manager', 'name email phone');
   if (!shop || shop.isDeleted) throw new ApiError(404, 'Shop not found.');
-  if (req.user.role === 'manager' && req.user.assignedShop._id.toString() !== shop._id.toString()) {
+  if (
+    req.user.role === 'manager' &&
+    (!req.user.assignedShop || req.user.assignedShop._id.toString() !== shop._id.toString())
+  ) {
     throw new ApiError(403, 'You can only view your assigned shop.');
   }
   res.json(ApiResponse.ok('Shop fetched', shop));
@@ -182,17 +188,20 @@ const getShopOverview = asyncHandler(async (req, res) => {
 });
 
 const createShop = asyncHandler(async (req, res) => {
-  const { name, address, contactNumber, manager } = req.body;
+  const { name, address, contactNumber, manager, shopType } = req.body;
   if (!name) throw new ApiError(400, 'Shop name is required.');
+  if (shopType !== undefined && !['warehouse', 'branch'].includes(shopType)) {
+    throw new ApiError(400, 'Shop type must be "warehouse" or "branch".');
+  }
 
-  const shop = await Shop.create({ name, address, contactNumber, manager });
+  const shop = await Shop.create({ name, address, contactNumber, manager, shopType });
 
   if (manager) {
     await User.findByIdAndUpdate(manager, { $set: { assignedShop: shop._id } });
   }
 
   await recordAudit(req, {
-    actionType: 'CREATE_USER',
+    actionType: 'CREATE_SHOP',
     module: 'shops',
     recordId: shop._id,
     recordType: 'Shop',
@@ -208,24 +217,35 @@ const updateShop = asyncHandler(async (req, res) => {
   if (!shop || shop.isDeleted) throw new ApiError(404, 'Shop not found.');
   const oldData = shop.toObject();
 
-  const { name, address, contactNumber, manager } = req.body;
+  const { name, address, contactNumber, manager, shopType } = req.body;
   if (name !== undefined) shop.name = name;
+  if (shopType !== undefined) {
+    if (!['warehouse', 'branch'].includes(shopType)) {
+      throw new ApiError(400, 'Shop type must be "warehouse" or "branch".');
+    }
+    shop.shopType = shopType;
+  }
   if (address !== undefined) shop.address = address;
   if (contactNumber !== undefined) shop.contactNumber = contactNumber;
   if (manager !== undefined) shop.manager = manager;
   await shop.save();
 
   if (manager !== undefined) {
-    const previous = await Shop.findById(req.params.id);
-    const prevManager = previous.manager;
-    if (prevManager && prevManager.toString() !== manager.toString()) {
+    // Use oldData, not a re-read: the shop was already saved above, so a fresh
+    // findById would return the NEW manager and the previous one would never
+    // be unassigned.
+    const prevManager = oldData.manager;
+    const newManager = shop.manager;
+    if (prevManager && (!newManager || prevManager.toString() !== newManager.toString())) {
       await User.findByIdAndUpdate(prevManager, { $set: { assignedShop: null } });
     }
-    await User.findByIdAndUpdate(manager, { $set: { assignedShop: shop._id } });
+    if (newManager) {
+      await User.findByIdAndUpdate(newManager, { $set: { assignedShop: shop._id } });
+    }
   }
 
   await recordAudit(req, {
-    actionType: 'UPDATE_USER',
+    actionType: 'UPDATE_SHOP',
     module: 'shops',
     recordId: shop._id,
     recordType: 'Shop',
@@ -238,11 +258,35 @@ const updateShop = asyncHandler(async (req, res) => {
 });
 
 const deleteShop = asyncHandler(async (req, res) => {
-  const { deleteReason } = req.body;
+  const { deleteReason, deactivateManager } = req.body;
   const shop = await Shop.findById(req.params.id);
   if (!shop) throw new ApiError(404, 'Shop not found.');
 
   const oldData = shop.toObject();
+
+  // Resolve every manager attached to this shop BEFORE soft-deleting. Two
+  // independent links exist (Shop.manager and User.assignedShop) and either can
+  // be the only one populated, so check both. Leaving user.assignedShop pointing
+  // at a deleted shop creates a half-working account: login still passes and
+  // every shop-scoped screen silently reads a deleted branch.
+  const assignees = await User.find({ assignedShop: shop._id }).select('_id name');
+  const ids = new Set(assignees.map((u) => u._id.toString()));
+  if (shop.manager) ids.add(shop.manager.toString());
+
+  let managerResolution = null;
+  if (ids.size > 0) {
+    const update = { $set: { assignedShop: null } };
+    if (deactivateManager) update.$set.isActive = false;
+    await User.updateMany({ _id: { $in: [...ids] } }, update);
+    const resolved = await User.find({ _id: { $in: [...ids] } }).select('name');
+    managerResolution = {
+      count: resolved.length,
+      names: resolved.map((u) => u.name),
+      assignedShopCleared: true,
+      deactivated: !!deactivateManager,
+    };
+  }
+
   shop.isDeleted = true;
   shop.deletedBy = req.user._id;
   shop.deletedAt = new Date();
@@ -250,17 +294,28 @@ const deleteShop = asyncHandler(async (req, res) => {
   await shop.save();
 
   await recordAudit(req, {
-    actionType: 'DELETE_USER',
+    actionType: 'DELETE_SHOP',
     module: 'shops',
     recordId: shop._id,
     recordType: 'Shop',
     oldData,
     newData: null,
     status: 'deleted',
-    remarks: `Shop "${shop.name}" soft-deleted`,
+    remarks: `Shop "${shop.name}" soft-deleted${
+      managerResolution
+        ? `; ${managerResolution.count} manager(s) unassigned (${managerResolution.names.join(
+            ', '
+          )})${managerResolution.deactivated ? ' and deactivated' : ''}`
+        : ''
+    }`,
   });
 
-  res.json(ApiResponse.ok('Shop deleted'));
+  res.json(
+    ApiResponse.ok('Shop deleted', {
+      shop: { id: shop._id.toString(), name: shop.name },
+      managerResolution,
+    })
+  );
 });
 
 const restoreShop = asyncHandler(async (req, res) => {
@@ -274,7 +329,7 @@ const restoreShop = asyncHandler(async (req, res) => {
   await shop.save();
 
   await recordAudit(req, {
-    actionType: 'RESTORE_PRODUCT',
+    actionType: 'RESTORE_SHOP',
     module: 'shops',
     recordId: shop._id,
     recordType: 'Shop',

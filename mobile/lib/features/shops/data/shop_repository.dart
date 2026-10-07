@@ -25,8 +25,11 @@ class ShopRepository {
     return Shop.fromJson(res['data'] as Map<String, dynamic>);
   }
 
-  Future<void> delete(String id, {String reason = ''}) async {
-    await _api.request('DELETE', '/shops/$id', data: {'deleteReason': reason});
+  Future<void> delete(String id, {String reason = '', bool deactivateManager = false}) async {
+    await _api.request('DELETE', '/shops/$id', data: {
+      'deleteReason': reason,
+      'deactivateManager': deactivateManager,
+    });
   }
 
   Future<Shop> restore(String id) async {

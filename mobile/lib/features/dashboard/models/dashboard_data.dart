@@ -286,6 +286,7 @@ class DashboardData {
   final List<ShopComparison> comparison;
   final List<ExpenseCategoryTotal> expenseBreakdown;
   final List<ShopSummary> shops;
+  final WarehouseSummary? warehouse;
   final List<TopProduct> topProducts;
   final List<TopCustomer> topCustomers;
   final List<LowStockProduct> lowStock;
@@ -303,6 +304,7 @@ class DashboardData {
     this.comparison = const [],
     this.expenseBreakdown = const [],
     this.shops = const [],
+    this.warehouse,
     this.topProducts = const [],
     this.topCustomers = const [],
     this.lowStock = const [],
@@ -324,6 +326,9 @@ class DashboardData {
       comparison: (charts['comparison'] as List?)?.map((e) => ShopComparison.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
       expenseBreakdown: (charts['expenseBreakdown'] as List?)?.map((e) => ExpenseCategoryTotal.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
       shops: (json['shops'] as List?)?.map((e) => ShopSummary.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
+      warehouse: json['warehouse'] == null
+          ? null
+          : WarehouseSummary.fromJson(json['warehouse'] as Map<String, dynamic>),
       topProducts: (json['topProducts'] as List?)?.map((e) => TopProduct.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
       topCustomers: (json['topCustomers'] as List?)?.map((e) => TopCustomer.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
       lowStock: (json['lowStock'] as List?)?.map((e) => LowStockProduct.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
@@ -345,6 +350,33 @@ class ShopSummary {
         id: (json['id'] ?? json['_id']).toString(),
         name: json['name']?.toString() ?? '',
         manager: json['manager']?.toString() ?? '',
+      );
+}
+
+class WarehouseSummary {
+  final List<ShopSummary> shops;
+  final int productCount;
+  final double totalQuantity;
+  final double stockValue;
+  final int lowStockCount;
+
+  const WarehouseSummary({
+    this.shops = const [],
+    this.productCount = 0,
+    this.totalQuantity = 0,
+    this.stockValue = 0,
+    this.lowStockCount = 0,
+  });
+
+  factory WarehouseSummary.fromJson(Map<String, dynamic> json) => WarehouseSummary(
+        shops: (json['shops'] as List?)
+                ?.map((e) => ShopSummary.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        productCount: (json['productCount'] as num?)?.toInt() ?? 0,
+        totalQuantity: (json['totalQuantity'] as num?)?.toDouble() ?? 0,
+        stockValue: (json['stockValue'] as num?)?.toDouble() ?? 0,
+        lowStockCount: (json['lowStockCount'] as num?)?.toInt() ?? 0,
       );
 }
 
