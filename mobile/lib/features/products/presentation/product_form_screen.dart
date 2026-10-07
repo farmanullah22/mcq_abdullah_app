@@ -58,7 +58,7 @@ const _typeSpecs = <String, _TypeSpec>{
     codeIcon: Icons.tag,
     showName: false,
     showFoamType: true,
-    showPicture: false,
+    showPicture: true,
     colorRows: false,
     blurb: 'Foam is stocked as one quantity. Name it with the code you use in the factory.',
   ),
@@ -82,7 +82,7 @@ const _typeSpecs = <String, _TypeSpec>{
     codeIcon: Icons.tag,
     showName: false,
     showFoamType: false,
-    showPicture: false,
+    showPicture: true,
     colorRows: true,
     blurb: 'Add a row per colour you keep in stock. The quantities add up to the total stock.',
   ),
@@ -333,6 +333,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (spec.colorRows) {
       data['variants'] = _variants.map((v) => v.toJson()).toList();
     }
+    if (_productType == 'carpet') {
+      data['costPerSqft'] = data['costPrice'];
+    }
 
     if (spec.showPicture) {
       if (_productImageBytes != null) {
@@ -543,11 +546,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
               _SectionCard(
                 title: 'Cost Price',
-                subtitle: 'One cost per piece. Selling price is typed when the sale is recorded.',
+                subtitle: _productType == 'carpet'
+                    ? 'One cost per sqft. Selling price is typed when the sale is recorded.'
+                    : 'One cost per piece. Selling price is typed when the sale is recorded.',
                 children: [
                   _NumField(
                     controller: _costPrice,
-                    label: 'Cost / piece (Rs.)',
+                    label: _productType == 'carpet' ? 'Cost / sqft (Rs.)' : 'Cost / piece (Rs.)',
                     icon: Icons.attach_money,
                     prefix: 'Rs. ',
                     validatorText: 'Enter the cost price',
