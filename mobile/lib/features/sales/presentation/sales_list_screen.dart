@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_bar_brand.dart';
@@ -214,21 +217,46 @@ class _DateFilterBar extends StatelessWidget {
   }
 }
 
-class SaleDetailScreen extends StatelessWidget {
+class SaleDetailScreen extends ConsumerStatefulWidget {
   const SaleDetailScreen({super.key, required this.sale});
 
   final Sale sale;
 
   @override
+  ConsumerState<SaleDetailScreen> createState() => _SaleDetailScreenState();
+}
+
+class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
+  late Sale _sale = widget.sale;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFullSale();
+  }
+
+  // The list payload omits product images, so fetch the full sale to show each
+  // product's picture on screen and on the shared invoice.
+  Future<void> _loadFullSale() async {
+    try {
+      final full = await ref.read(saleRepositoryProvider).getSale(widget.sale.id);
+      if (mounted) setState(() => _sale = full);
+    } catch (_) {
+      // Keep the data we already have if the refresh fails.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sale = _sale;
     return Scaffold(
       appBar: AppBar(
         title: Text(sale.invoiceNo),
         actions: [
           IconButton(
             tooltip: 'Share invoice',
-            onPressed: () => _shareInvoice(context, sale),
+            onPressed: _shareInvoice,
             icon: const Icon(Icons.ios_share),
           ),
         ],
@@ -291,7 +319,10 @@ class SaleDetailScreen extends StatelessWidget {
                 ...sale.items.map((item) => Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _ProductThumb(image: item.image),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,9 +384,10 @@ class SaleDetailScreen extends StatelessWidget {
       ),
     );
   }
-Future<void> _shareInvoice(BuildContext context, Sale sale) async {
+  Future<void> _shareInvoice() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
+      final sale = await ref.read(saleRepositoryProvider).getSale(widget.sale.id);
       final bytes = await InvoicePdf.build(sale);
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/Invoice_${sale.invoiceNo}.pdf');
@@ -541,5 +573,40 @@ class _SaleTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ProductThumb extends StatelessWidget {
+  const _ProductThumb({required this.image});
+
+  final String image;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _decodeImageBytes(image);
+    return Container(
+      width: 44,
+      height: 44,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+      ),
+      child: bytes == null
+          ? const Icon(Icons.image_outlined, color: AppColors.primary, size: 20)
+          : Image.memory(bytes, fit: BoxFit.cover),
+    );
+  }
+}
+
+Uint8List? _decodeImageBytes(String data) {
+  if (data.isEmpty) return null;
+  try {
+    final comma = data.indexOf(',');
+    final base64 = data.startsWith('data:') && comma >= 0 ? data.substring(comma + 1) : data;
+    return base64Decode(base64);
+  } catch (_) {
+    return null;
   }
 }

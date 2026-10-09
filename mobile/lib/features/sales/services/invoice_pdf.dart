@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
@@ -328,6 +329,7 @@ class InvoicePdf {
 
   static pw.Widget _itemRow(SaleItem item, int index) {
     final even = index.isEven;
+    final image = _imageWidget(item.image);
 
     if (item.isFoam) {
       return pw.Container(
@@ -336,7 +338,15 @@ class InvoicePdf {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
-            pw.Text(item.productName, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _ink)),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (image != null) ...[image, pw.SizedBox(width: 8)],
+                pw.Expanded(
+                  child: pw.Text(item.productName, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _ink)),
+                ),
+              ],
+            ),
             pw.SizedBox(height: 4),
             if (item.foamQty > 0) _breakdownRow('Foam', item.foamQty, item.unitPrice),
             if (item.pillowQty > 0) _breakdownRow('Pillows', item.pillowQty, item.unitPrice),
@@ -357,7 +367,18 @@ class InvoicePdf {
       padding: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: pw.Row(
         children: [
-          pw.Expanded(flex: 5, child: pw.Text(item.productName, style: const pw.TextStyle(fontSize: 10, color: _ink))),
+          pw.Expanded(
+            flex: 5,
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (image != null) ...[image, pw.SizedBox(width: 8)],
+                pw.Expanded(
+                  child: pw.Text(item.productName, style: const pw.TextStyle(fontSize: 10, color: _ink)),
+                ),
+              ],
+            ),
+          ),
           pw.Expanded(
             flex: 2,
             child: pw.Align(
@@ -385,6 +406,39 @@ class InvoicePdf {
         ],
       ),
     );
+  }
+
+  static pw.Widget? _imageWidget(String data) {
+    final bytes = _decodeImage(data);
+    if (bytes == null) return null;
+    try {
+      return pw.Container(
+        width: 34,
+        height: 34,
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _line),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.ClipRRect(
+          horizontalRadius: 4,
+          verticalRadius: 4,
+          child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.cover),
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Uint8List? _decodeImage(String data) {
+    if (data.isEmpty) return null;
+    try {
+      final comma = data.indexOf(',');
+      final base64 = data.startsWith('data:') && comma >= 0 ? data.substring(comma + 1) : data;
+      return base64Decode(base64);
+    } catch (_) {
+      return null;
+    }
   }
 
   static pw.Widget _breakdownRow(String label, int qty, double unitPrice) => pw.Row(

@@ -15,6 +15,30 @@ const fmtDate = (d) =>
     minute: '2-digit',
   });
 
+// Product images are stored as base64 data URLs; pdfkit needs raw bytes.
+const decodeImageDataUrl = (data) => {
+  if (!data || typeof data !== 'string') return null;
+  const comma = data.indexOf(',');
+  const base64 = data.startsWith('data:') && comma >= 0 ? data.slice(comma + 1) : data;
+  try {
+    const buf = Buffer.from(base64, 'base64');
+    return buf.length ? buf : null;
+  } catch (err) {
+    return null;
+  }
+};
+
+const isJpeg = (buf) => !!buf && buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+
+// First image of the product attached to a sale item (populated), if any.
+// Only JPEGs are embedded: pdfkit 0.20.2 can hang the event loop on some PNGs.
+const saleItemImage = (item) => {
+  const images = item && item.product && item.product.images;
+  if (!Array.isArray(images) || !images.length) return null;
+  const buf = decodeImageDataUrl(images[0]);
+  return isJpeg(buf) ? buf : null;
+};
+
 // Converts a local phone number (e.g. "03001234567") into international E.164
 // format without the leading "+" (e.g. "923001234567"), which WhatsApp expects.
 const normalizePhone = (phone, countryCode = '92') => {
@@ -49,7 +73,7 @@ const generateSaleReceiptPDF = async (sale) => {
     doc.rect(margin, margin + 20, width, 1).fill(GOLD);
 
     // ---- Header ----
-    doc.roundRect(margin, margin + 22, width, 78, 0).fill('#FFFFFF');
+    doc.roundedRect(margin, margin + 22, width, 78, 0).fill('#FFFFFF');
     doc.font('Helvetica-Bold').fontSize(20).fillColor(INK).text('HAYAT FOAM', margin + 22, margin + 34);
     doc.font('Helvetica').fontSize(9).fillColor(MUTED).text('PREMIUM FOAM & MATTRESS SOLUTIONS', margin + 22, margin + 62, { characterSpacing: 1 });
     doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(shopName, margin + 22, margin + 76);
@@ -72,7 +96,7 @@ const generateSaleReceiptPDF = async (sale) => {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(GOLD);
     const method = (sale.paymentMethod || 'cash').toUpperCase();
     const pw = doc.widthOfString(method) + 14;
-    doc.roundRect(margin, doc.y - 9, pw + 8, 14, 7).stroke(GOLD);
+    doc.roundedRect(margin, doc.y - 9, pw + 8, 14, 7).stroke(GOLD);
     doc.text(method, margin + 4, doc.y);
     doc.y += 6;
 
@@ -101,23 +125,28 @@ const generateSaleReceiptPDF = async (sale) => {
     });
     doc.y += 24;
 
-    const drawRow = (cells, { font = 'Helvetica', size = 9, color = INK, bg = null, padTop = 5, padBottom = 5, indent = 0 }) => {
+    const drawRow = (cells, { font = 'Helvetica', size = 9, color = INK, bg = null, indent = 0, image = null }) => {
       if (doc.y > 740) doc.addPage();
-      if (bg) { doc.fillColor(bg).rect(x0, doc.y - 2, tableW, 20).fill(); }
+      if (bg) { doc.fillColor(bg).rect(x0, doc.y - 2, tableW, image ? 26 : 20).fill(); }
+      if (image) {
+        try { doc.image(image, x0 + 8, doc.y - 1, { fit: [16, 16] }); } catch (err) { /* skip broken image */ }
+      }
       doc.font(font).fontSize(size).fillColor(color);
       x = x0;
       cells.forEach((cell, i) => {
-        doc.text(cell, x + 8 + indent, doc.y, { width: cols[i] - 8 - indent, align: i === 0 ? 'left' : 'right' });
+        const shift = i === 0 ? indent + (image ? 22 : 0) : 0;
+        doc.text(cell, x + 8 + shift, doc.y, { width: cols[i] - 8 - shift, align: i === 0 ? 'left' : 'right' });
         x += cols[i];
       });
-      doc.moveDown(1);
+      doc.moveDown(image ? 1.7 : 1);
     };
 
     (sale.items || []).forEach((it, idx) => {
       const even = idx % 2 === 0 ? LIGHT : '#FFFFFF';
       const units = currency(it.unitPrice);
+      const image = saleItemImage(it);
       if (it.foamQty || it.pillowQty || it.coverQty) {
-        drawRow([it.productName || '-', '', '', ''], { font: 'Helvetica-Bold', size: 9.5, bg: even });
+        drawRow([it.productName || '-', '', '', ''], { font: 'Helvetica-Bold', size: 9.5, bg: even, image });
         if (it.foamQty) {
           drawRow([`    · Foam`, `${it.foamQty}`, units, currency(it.foamQty * it.unitPrice)], { bg: even, color: '#555555', size: 8.5, indent: 0 });
         }
@@ -130,7 +159,7 @@ const generateSaleReceiptPDF = async (sale) => {
         doc.rect(x0, doc.y + 2, tableW, 0.6).fill(LINE);
         doc.y += 8;
       } else {
-        drawRow([it.productName || '-', `${it.quantity}`, units, currency(it.totalAmount)], { bg: even });
+        drawRow([it.productName || '-', `${it.quantity}`, units, currency(it.totalAmount)], { bg: even, image });
       }
     });
 

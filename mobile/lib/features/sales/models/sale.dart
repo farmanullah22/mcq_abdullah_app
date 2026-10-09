@@ -7,6 +7,7 @@ class SaleItem {
   final int foamQty;
   final int pillowQty;
   final int coverQty;
+  final String image;
 
   const SaleItem({
     required this.productId,
@@ -17,12 +18,18 @@ class SaleItem {
     this.foamQty = 0,
     this.pillowQty = 0,
     this.coverQty = 0,
+    this.image = '',
   });
 
   bool get isFoam => foamQty > 0 || pillowQty > 0 || coverQty > 0;
 
   factory SaleItem.fromJson(Map<String, dynamic> json) {
     final product = json['product'];
+    String image = json['image']?.toString() ?? '';
+    if (image.isEmpty && product is Map<String, dynamic>) {
+      final images = product['images'];
+      if (images is List && images.isNotEmpty) image = images.first.toString();
+    }
     return SaleItem(
       productId: product is Map<String, dynamic>
           ? (product['id'] ?? product['_id']).toString()
@@ -34,6 +41,7 @@ class SaleItem {
       foamQty: (json['foamQty'] as num?)?.toInt() ?? 0,
       pillowQty: (json['pillowQty'] as num?)?.toInt() ?? 0,
       coverQty: (json['coverQty'] as num?)?.toInt() ?? 0,
+      image: image,
     );
   }
 }

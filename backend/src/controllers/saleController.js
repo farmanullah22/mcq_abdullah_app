@@ -56,6 +56,8 @@ const getSale = asyncHandler(async (req, res) => {
   const sale = await Sale.findById(req.params.id)
     .populate('shop', 'name address contactNumber')
     .populate('createdBy', 'name role')
+    // Product image is needed so the generated invoice can show it.
+    .populate('items.product', 'images')
     .select(req.user.role === 'manager' ? '-profit -items.costPrice' : '');
   if (!sale || sale.isDeleted) throw new ApiError(404, 'Sale not found.');
   res.json(ApiResponse.ok('Sale fetched', sale));
@@ -367,6 +369,8 @@ const createSale = asyncHandler(async (req, res) => {
 
   // Send the PDF receipt to the customer's WhatsApp number (if one is given
   // and WhatsApp is configured). Failures never affect the sale itself.
+  // Attach each item's product image so the receipt can render thumbnails.
+  await sale.populate({ path: 'items.product', select: 'images' });
   const whatsappService = require('../services/whatsappService');
   sale.whatsappReceipt = await whatsappService.sendWhatsAppReceipt(sale, sale.customerPhone);
 
