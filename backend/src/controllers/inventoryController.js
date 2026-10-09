@@ -420,17 +420,8 @@ const transferStock = asyncHandler(async (req, res) => {
   const fromProduct = await Product.findOne({ _id: productId, shop: fromShopId, isDeleted: false });
   if (!fromProduct) throw new ApiError(404, 'Source product not found in the selected shop.');
 
-  const warehouse = await getWarehouseShop(Shop);
-  if (warehouse) {
-    const fromIsWh = String(fromShop._id) === String(warehouse._id);
-    const toIsWh = String(toShop._id) === String(warehouse._id);
-    if (fromIsWh && toIsWh) {
-      throw new ApiError(400, 'Cannot transfer stock from the warehouse to itself.');
-    }
-    if (!fromIsWh && !toIsWh) {
-      throw new ApiError(400, 'Stock moves only between the warehouse and a branch. Branch-to-branch transfers are not allowed.');
-    }
-  }
+  // Stock may move between any two distinct shops: warehouse <-> branch or
+  // branch <-> branch. The only invalid case (same shop) is rejected above.
 
   const pt = fromProduct.productType || 'qaleen';
   let moveQty = 0;
@@ -684,7 +675,8 @@ const transferStock = asyncHandler(async (req, res) => {
 });
 
 // Active shops a transfer can involve. Managers need the full list because a
-// transfer may either start or end at any location (branch <-> warehouse).
+// transfer may start or end at any location (warehouse <-> branch or
+// branch <-> branch).
 const transferShops = asyncHandler(async (req, res) => {
   const { shopTypeOf } = require('../utils/warehouse');
   const shops = await Shop.find({ isDeleted: false }).sort({ createdAt: 1 });

@@ -2205,18 +2205,19 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
   }
 
   List<TransferShopMeta> _allowedDestinations(String? fromId) {
-    TransferShopMeta? from;
-    for (final s in _shops) {
-      if (s.id == fromId) {
-        from = s;
-        break;
-      }
-    }
-    if (from == null) return const [];
-    final fromMeta = from;
-    return _shops
-        .where((s) => s.id != fromId && s.isWarehouse != fromMeta.isWarehouse)
-        .toList();
+    if (fromId == null) return const [];
+    final user = ref.read(currentUserProvider);
+    final isManager = user != null && !user.isAdmin;
+    final myShopId = user?.assignedShopId;
+    final fromIsMine = myShopId != null && fromId == myShopId;
+    return _shops.where((s) {
+      // Any other location is valid (warehouse <-> branch or branch <-> branch).
+      if (s.id == fromId) return false;
+      // A manager must always be on one side of the transfer, so when stock is
+      // leaving someone else's shop the only valid destination is their own.
+      if (isManager && !fromIsMine && s.id != myShopId) return false;
+      return true;
+    }).toList();
   }
 
   Future<void> _loadShops() async {
