@@ -41,6 +41,21 @@ const saleItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const whatsappReceiptSchema = new mongoose.Schema(
+  {
+    attempted: { type: Boolean, default: false },
+    sent: { type: Boolean, default: false },
+    reason: { type: String, default: '' }, // not_configured | invalid_phone | test_mode_blocked | already_attempted | sent | error
+    error: { type: String, default: '' },
+    messageId: { type: String, default: '' }, // Meta wamid
+    invoiceNo: { type: String, default: '' },
+    status: { type: String, default: '' }, // pending | sending | sent | delivered | read | failed
+    statusChangedAt: { type: Date, default: null },
+    sentAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const saleSchema = new mongoose.Schema(
   {
     invoiceNo: { type: String, required: true, unique: true },
@@ -61,6 +76,7 @@ const saleSchema = new mongoose.Schema(
     },
     notes: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    whatsappReceipt: { type: whatsappReceiptSchema, default: null },
     isDeleted: { type: Boolean, default: false },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     deletedAt: { type: Date, default: null },

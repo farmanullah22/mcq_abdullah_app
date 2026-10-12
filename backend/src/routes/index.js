@@ -17,6 +17,7 @@ const analyticsRoutes = require('./analyticsRoutes');
 const auditRoutes = require('./auditRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const khataRoutes = require('./khataRoutes');
+const webhookRoutes = require('./webhookRoutes');
 const { notFound } = require('../middleware/errorHandler');
 
 router.get('/health', (req, res) =>
@@ -39,6 +40,9 @@ router.use('/analytics', protect, analyticsRoutes);
 router.use('/audit', protect, auditRoutes);
 router.use('/notifications', protect, notificationRoutes);
 router.use('/khata', protect, khataRoutes);
+
+// Public: authenticated by Meta's signature/verify-token, not a user JWT.
+router.use('/whatsapp', webhookRoutes);
 
 router.use(notFound);
 

@@ -1,8 +1,9 @@
 const PDFDocument = require('pdfkit');
+const crypto = require('crypto');
 const Shop = require('../models/Shop');
 const config = require('../config');
 
-const GRAPH_VERSION = 'v21.0';
+const graphUrl = (path = '') => `https://graph.facebook.com/${config.whatsapp.apiVersion}/${config.whatsapp.phoneId}${path}`;
 
 const currency = (n) => `Rs. ${Number(n || 0).toLocaleString('en-PK')}`;
 
@@ -41,11 +42,13 @@ const saleItemImage = (item) => {
 
 // Converts a local phone number (e.g. "03001234567") into international E.164
 // format without the leading "+" (e.g. "923001234567"), which WhatsApp expects.
+// Handles 0, 00, +92 and 92 prefixes.
 const normalizePhone = (phone, countryCode = '92') => {
   const digits = (phone || '').replace(/\D+/g, '');
   if (!digits) return '';
   let normalized = digits;
-  if (digits.startsWith('0')) normalized = countryCode + digits.slice(1);
+  if (normalized.startsWith('00')) normalized = normalized.slice(2);
+  if (normalized.startsWith('0')) normalized = countryCode + normalized.slice(1);
   return /^\d{10,15}$/.test(normalized) ? normalized : '';
 };
 
@@ -202,7 +205,7 @@ const uploadMedia = async (buffer, filename) => {
   form.append('type', 'application/pdf');
   form.append('file', new Blob([buffer], { type: 'application/pdf' }), filename);
 
-  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${config.whatsapp.phoneId}/media`, {
+  const res = await fetch(graphUrl('/media'), {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.whatsapp.token}` },
     body: form,
@@ -216,7 +219,7 @@ const uploadMedia = async (buffer, filename) => {
 };
 
 const sendDocumentMessage = async (to, mediaId, filename, caption) => {
-  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${config.whatsapp.phoneId}/messages`, {
+  const res = await fetch(graphUrl('/messages'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${config.whatsapp.token}`,
@@ -234,7 +237,44 @@ const sendDocumentMessage = async (to, mediaId, filename, caption) => {
   if (!res.ok) {
     throw new Error(json.error ? json.error.message : 'WhatsApp message send failed');
   }
-  return json.messages && json.messages[0];
+  return json.messages && json.messages[0] ? json.messages[0].id : '';
+};
+
+// Optional fallback using an approved utility template when document delivery
+// is rejected by WhatsApp. The template body must declare exactly two
+// parameters: {{1}} invoice number, {{2}} total amount.
+const sendUtilityTemplate = async (to, invoiceNo, amount) => {
+  const res = await fetch(graphUrl('/messages'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.whatsapp.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: config.whatsapp.utilityTemplate,
+        language: { code: 'en' },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: invoiceNo },
+              { type: 'text', text: String(amount) },
+            ],
+          },
+        ],
+      },
+    }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error ? json.error.message : 'WhatsApp template send failed');
+  }
+  return json.messages && json.messages[0] ? json.messages[0].id : '';
 };
 
 /**
@@ -243,24 +283,119 @@ const sendDocumentMessage = async (to, mediaId, filename, caption) => {
  * break the sale itself.
  */
 const sendWhatsAppReceipt = async (sale, phone) => {
+  // Idempotency: a sale whose receipt was already attempted is never resent.
+  if (sale.whatsappReceipt && sale.whatsappReceipt.attempted) {
+    return {
+      attempted: true,
+      sent: sale.whatsappReceipt.sent === true,
+      reason: 'already_attempted',
+      error: null,
+      messageId: sale.whatsappReceipt.messageId || '',
+      invoiceNo: sale.invoiceNo || '',
+    };
+  }
+
   if (!config.whatsapp.enabled || !config.whatsapp.receiptsEnabled) {
-    return { attempted: false, sent: false, reason: 'not_configured', error: null };
+    return { attempted: false, sent: false, reason: 'not_configured', error: null, invoiceNo: sale.invoiceNo || '' };
   }
 
   const to = normalizePhone(phone, config.whatsapp.countryCode);
   if (!to) {
-    return { attempted: true, sent: false, reason: 'invalid_phone', error: 'Invalid WhatsApp phone number.' };
+    return { attempted: true, sent: false, reason: 'invalid_phone', error: 'Invalid WhatsApp phone number.', invoiceNo: sale.invoiceNo || '' };
   }
 
+  // Never message real customers while test mode is enabled: only the
+  // explicitly configured, verified test recipient is allowed.
+  if (config.whatsapp.testMode) {
+    const safe = normalizePhone(config.whatsapp.testRecipient, config.whatsapp.countryCode);
+    if (!safe) {
+      return {
+        attempted: false,
+        sent: false,
+        reason: 'test_mode_no_recipient',
+        error: 'WHATSAPP_TEST_MODE is on but WHATSAPP_TEST_RECIPIENT is not set.',
+        invoiceNo: sale.invoiceNo || '',
+      };
+    }
+    if (to !== safe) {
+      return {
+        attempted: false,
+        sent: false,
+        reason: 'test_mode_blocked',
+        error: 'Test mode only delivers to the configured test recipient.',
+        invoiceNo: sale.invoiceNo || '',
+      };
+    }
+  }
+
+  const base = { attempted: true, sent: false, invoiceNo: sale.invoiceNo || '' };
   try {
     const filename = `Invoice_${sale.invoiceNo}.pdf`;
     const buffer = await generateSaleReceiptPDF(sale);
     const mediaId = await uploadMedia(buffer, filename);
-    await sendDocumentMessage(to, mediaId, filename, `Invoice ${sale.invoiceNo} - Hayat Foam. Thank you!`);
-    return { attempted: true, sent: true, reason: 'sent', error: null };
+    const messageId = await sendDocumentMessage(to, mediaId, filename, `Invoice ${sale.invoiceNo} - Hayat Foam. Thank you!`);
+    return { ...base, sent: true, reason: 'sent', messageId: messageId || '' };
   } catch (err) {
-    return { attempted: true, sent: false, reason: 'error', error: err.message };
+    // Optional fallback: if a utility template is configured and the document
+    // delivery failed, try an approved template message instead.
+    const errMsg = err && err.message ? err.message : 'WhatsApp delivery failed';
+    if (config.whatsapp.utilityTemplate) {
+      try {
+        const total = sale.totalAmount || 0;
+        const messageId = await sendUtilityTemplate(to, sale.invoiceNo || '', total);
+        return { ...base, sent: true, reason: 'sent_template', error: errMsg, messageId: messageId || '' };
+      } catch (templateErr) {
+        return { ...base, reason: 'error', error: `${errMsg}. Template fallback failed: ${templateErr && templateErr.message}`.slice(0, 500) };
+      }
+    }
+    return { ...base, reason: 'error', error: errMsg.slice(0, 500) };
   }
 };
 
-module.exports = { sendWhatsAppReceipt, generateSaleReceiptPDF, normalizePhone };
+// Verifies Meta's X-Hub-Signature-256 header over the raw request body using
+// the configured App Secret. Returns false when not configured or on mismatch.
+const verifyWebhookSignature = (rawBody, signatureHeader, secret) => {
+  if (!secret || !secret.length || !rawBody || !signatureHeader) return false;
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const provided = String(signatureHeader).replace(/^sha256=/, '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(provided)) return false;
+  return crypto.timingSafeEqual(Buffer.from(provided, 'hex'), Buffer.from(expected, 'hex'));
+};
+
+// Flattens a Meta webhook payload into delivery status entries.
+const parseWebhookEntries = (body) => {
+  if (!body || !Array.isArray(body.entry)) return [];
+  const entries = [];
+  for (const entry of body.entry) {
+    if (!Array.isArray(entry.changes)) continue;
+    for (const change of entry.changes) {
+      const value = change && change.value ? change.value : {};
+      if (!Array.isArray(value.statuses)) continue;
+      for (const status of value.statuses) {
+        const messageId = status && (status.id || status.messageId || '');
+        if (!messageId) continue;
+        entries.push({
+          messageId,
+          status: status.status || '',
+          statusChangedAt: status.timestamp ? new Date(status.timestamp * 1000) : null,
+          error:
+            status.status === 'failed' && Array.isArray(status.errors) && status.errors.length
+              ? status.errors
+                  .map((e) => (e ? e.message || e.title || '' : ''))
+                  .filter(Boolean)
+                  .join('; ')
+              : '',
+        });
+      }
+    }
+  }
+  return entries;
+};
+
+module.exports = {
+  sendWhatsAppReceipt,
+  generateSaleReceiptPDF,
+  normalizePhone,
+  verifyWebhookSignature,
+  parseWebhookEntries,
+};

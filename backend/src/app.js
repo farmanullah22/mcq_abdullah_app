@@ -10,7 +10,15 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+// Keep the raw request bytes so WhatsApp webhook signatures can be verified.
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
 
