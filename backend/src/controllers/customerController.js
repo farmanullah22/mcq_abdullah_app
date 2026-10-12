@@ -1,5 +1,6 @@
 const Customer = require('../models/Customer');
 const Sale = require('../models/Sale');
+const Shop = require('../models/Shop');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
@@ -72,7 +73,13 @@ const createCustomer = asyncHandler(async (req, res) => {
   const { name, phone, email, address, city, notes, balance } = req.body;
   if (!name || !name.trim()) throw new ApiError(400, 'Customer name is required.');
 
-  const shopId = shopFilter(req);
+  // Admins may target a specific shop (body.shopId) or fall back to the first
+  // active shop, mirroring expense creation. Without this the POST route (which
+  // has no scopedShop middleware) left req.shopId undefined and always 400'd.
+  const shopId =
+    req.user.role === 'manager'
+      ? req.user.assignedShop._id
+      : req.body.shopId || (await Shop.findOne({ isDeleted: false }))?._id;
   if (!shopId) throw new ApiError(400, 'shopId is required.');
 
   const customer = await Customer.create({

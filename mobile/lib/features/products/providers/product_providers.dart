@@ -22,12 +22,13 @@ class ProductListState {
     AsyncValue<ProductPage>? data,
     String? search,
     String? categoryId,
+    bool clearCategory = false,
     bool? lowStockOnly,
   }) {
     return ProductListState(
       data: data ?? this.data,
       search: search ?? this.search,
-      categoryId: categoryId,
+      categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       lowStockOnly: lowStockOnly ?? this.lowStockOnly,
     );
   }
@@ -64,7 +65,7 @@ class ProductListController extends Notifier<ProductListState> {
   }
 
   void setCategory(String? categoryId) {
-    state = state.copyWith(categoryId: categoryId);
+    state = state.copyWith(categoryId: categoryId, clearCategory: categoryId == null);
     _load();
   }
 

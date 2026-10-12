@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/status_views.dart';
+import '../../dashboard/providers/dashboard_providers.dart';
 import '../models/supplier.dart';
 import '../providers/supplier_providers.dart';
 
@@ -66,6 +67,7 @@ class _SupplierFormScreenState extends ConsumerState<SupplierFormScreen> {
               city: _city.text.trim(),
               notes: _notes.text.trim(),
               balance: double.tryParse(_balance.text.trim()) ?? 0,
+              shopId: ref.read(dashboardControllerProvider).selectedShopId,
             )
         : await ref.read(supplierMutationControllerProvider.notifier).update(s.id, {
               'name': _name.text.trim(),

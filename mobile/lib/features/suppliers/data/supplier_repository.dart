@@ -49,6 +49,7 @@ class SupplierRepository {
     String city = '',
     String notes = '',
     double balance = 0,
+    String? shopId,
   }) async {
     final res = await _api.request('POST', '/suppliers', data: {
       'name': name,
@@ -58,6 +59,7 @@ class SupplierRepository {
       'city': city,
       'notes': notes,
       'balance': balance,
+      'shopId': ?shopId,
     });
     return Supplier.fromJson(res['data'] as Map<String, dynamic>);
   }

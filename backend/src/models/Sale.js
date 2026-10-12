@@ -81,6 +81,9 @@ const saleSchema = new mongoose.Schema(
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     deletedAt: { type: Date, default: null },
     deleteReason: { type: String, default: '' },
+    // True when the sale was deleted with restock:true (stock returned). Used to
+    // re-deduct stock if the sale is later restored.
+    restocked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

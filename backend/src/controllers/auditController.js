@@ -86,7 +86,7 @@ const auditStats = asyncHandler(async (req, res) => {
 });
 
 const restoreRecord = asyncHandler(async (req, res) => {
-  const { logId } = req.params;
+  const logId = req.params.id;
   const log = await AuditLog.findById(logId);
   if (!log) throw new ApiError(404, 'Audit log not found.');
   if (log.status === 'restored') throw new ApiError(400, 'This record was already restored.');

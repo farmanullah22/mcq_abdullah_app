@@ -55,6 +55,7 @@ class CustomerRepository {
     String city = '',
     String notes = '',
     double balance = 0,
+    String? shopId,
   }) async {
     final res = await _api.request('POST', '/customers', data: {
       'name': name,
@@ -64,6 +65,7 @@ class CustomerRepository {
       'city': city,
       'notes': notes,
       'balance': balance,
+      'shopId': ?shopId,
     });
     return Customer.fromJson(res['data'] as Map<String, dynamic>);
   }

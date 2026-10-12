@@ -62,6 +62,7 @@ class SupplierMutationController extends Notifier<SupplierMutationState> {
     String city = '',
     String notes = '',
     double balance = 0,
+    String? shopId,
   }) async {
     state = const SupplierMutationState(loading: true);
     try {
@@ -73,6 +74,7 @@ class SupplierMutationController extends Notifier<SupplierMutationState> {
             city: city,
             notes: notes,
             balance: balance,
+            shopId: shopId,
           );
       state = const SupplierMutationState();
       ref.invalidate(supplierListControllerProvider);

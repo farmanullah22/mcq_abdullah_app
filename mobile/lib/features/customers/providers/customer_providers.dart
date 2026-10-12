@@ -62,6 +62,7 @@ class CustomerMutationController extends Notifier<CustomerMutationState> {
     String city = '',
     String notes = '',
     double balance = 0,
+    String? shopId,
   }) async {
     state = const CustomerMutationState(loading: true);
     try {
@@ -73,6 +74,7 @@ class CustomerMutationController extends Notifier<CustomerMutationState> {
             city: city,
             notes: notes,
             balance: balance,
+            shopId: shopId,
           );
       state = const CustomerMutationState();
       ref.invalidate(customerListControllerProvider);

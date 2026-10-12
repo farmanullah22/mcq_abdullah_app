@@ -15,7 +15,7 @@ const buildProductQuery = (req) => {
     filter.shop = req.shopId;
   }
 
-  const { search, category, brand, supplier, lowStock } = req.query;
+  const { search, category, categoryId, brand, supplier, lowStock } = req.query;
   if (search) {
     filter.$or = [
       { name: { $regex: search, $options: 'i' } },
@@ -23,7 +23,8 @@ const buildProductQuery = (req) => {
       { barcode: { $regex: search, $options: 'i' } },
     ];
   }
-  if (category) filter.category = category;
+  const categoryFilter = categoryId || category;
+  if (categoryFilter) filter.category = categoryFilter;
   if (brand) filter.brand = { $regex: brand, $options: 'i' };
   if (supplier) filter.supplier = { $regex: supplier, $options: 'i' };
   if (lowStock === 'true') {

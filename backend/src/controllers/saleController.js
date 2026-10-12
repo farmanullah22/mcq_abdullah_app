@@ -60,6 +60,10 @@ const getSale = asyncHandler(async (req, res) => {
     .populate('items.product', 'images')
     .select(req.user.role === 'manager' ? '-profit -items.costPrice' : '');
   if (!sale || sale.isDeleted) throw new ApiError(404, 'Sale not found.');
+  const saleShopId = sale.shop && sale.shop._id ? sale.shop._id : sale.shop;
+  if (req.user.role === 'manager' && String(saleShopId) !== String(req.user.assignedShop._id)) {
+    throw new ApiError(403, 'You can only view sales of your assigned shop.');
+  }
   res.json(ApiResponse.ok('Sale fetched', sale));
 });
 
@@ -72,8 +76,16 @@ const createSale = asyncHandler(async (req, res) => {
   const shopId =
     req.user.role === 'manager'
       ? req.user.assignedShop._id
-      : req.body.shopId || (await require('../models/Shop').findOne({ isDeleted: false }))._id;
+      : req.body.shopId || (await Shop.findOne({ isDeleted: false }))?._id;
   if (!shopId) throw new ApiError(400, 'shopId is required.');
+
+  // Validate the payment method up front so a value the Sale model would reject
+  // can never fail after stock has already been deducted.
+  const allowedPaymentMethods = ['cash', 'bank', 'easypaisa', 'jazzcash', 'credit'];
+  const payment = paymentMethod || 'cash';
+  if (!allowedPaymentMethods.includes(payment)) {
+    throw new ApiError(400, `Invalid payment method "${payment}".`);
+  }
 
   const warehouse = await getWarehouseShop(Shop);
   if (warehouse && String(shopId) === String(warehouse._id)) {
@@ -83,17 +95,29 @@ const createSale = asyncHandler(async (req, res) => {
   const saleItems = [];
   const inventoryLogs = [];
   const touchedProducts = [];
+  // Cache product documents so a product listed twice in one sale mutates a
+  // single document (and is deducted correctly) instead of two stale copies.
+  const productCache = new Map();
+  // Snapshot stock before mutation so a failed write can be rolled back, keeping
+  // inventory consistent with the persisted sale records.
+  const stockSnapshots = new Map();
   let subtotal = 0;
   let profit = 0;
 
   const invoiceNo = await generateInvoiceNo();
 
   for (const item of items) {
-    const product = await Product.findById(item.productId).populate('category', 'name');
+    const cacheKey = String(item.productId);
+    let product = productCache.get(cacheKey);
+    if (!product) {
+      product = await Product.findById(item.productId).populate('category', 'name');
+      if (product) productCache.set(cacheKey, product);
+    }
     if (!product || product.isDeleted) throw new ApiError(404, `Product not found for item.`);
     if (product.shop.toString() !== shopId.toString()) {
       throw new ApiError(400, `"${product.name}" does not belong to this shop.`);
     }
+    if (!stockSnapshots.has(cacheKey)) stockSnapshots.set(cacheKey, product.toObject());
 
     const productId = product._id;
     const productName = product.name;
@@ -320,29 +344,55 @@ const createSale = asyncHandler(async (req, res) => {
   const paidValue = Math.min(Math.max(Number(paidAmount) || 0, 0), totalAmount);
   const dueValue = totalAmount - paidValue;
 
-  // Everything validated: now deduct the stock and write the sale.
-  for (const p of touchedProducts) {
-    await p.save();
+  // Everything validated: deduct stock and write the sale. If any write fails
+  // after the deducted stock has been persisted, roll the stock back so a
+  // rejected sale can never leave inventory out of sync.
+  let sale;
+  try {
+    for (const p of touchedProducts) {
+      await p.save();
+    }
+
+    sale = await Sale.create({
+      invoiceNo,
+      shop: shopId,
+      customerName: customerName || 'Walk-in Customer',
+      customerPhone: customerPhone || '',
+      items: saleItems,
+      subtotal,
+      discount: discountValue,
+      totalAmount,
+      paidAmount: paidValue,
+      dueAmount: dueValue,
+      profit,
+      paymentMethod: payment,
+      notes: notes || '',
+      createdBy: req.user._id,
+    });
+
+    if (inventoryLogs.length > 0) await InventoryLog.insertMany(inventoryLogs);
+  } catch (err) {
+    if (sale && sale._id) await Sale.deleteOne({ _id: sale._id });
+    for (const [id, snapshot] of stockSnapshots) {
+      await Product.updateOne(
+        { _id: id },
+        {
+          $set: {
+            quantity: snapshot.quantity,
+            pillowStock: snapshot.pillowStock,
+            coverStock: snapshot.coverStock,
+            meterLength: snapshot.meterLength,
+            carpetPieces: snapshot.carpetPieces,
+            carpetPiecesData: snapshot.carpetPiecesData,
+            qaleenSizes: snapshot.qaleenSizes,
+            variants: snapshot.variants,
+            colorStocks: snapshot.colorStocks,
+          },
+        }
+      );
+    }
+    throw err;
   }
-
-  const sale = await Sale.create({
-    invoiceNo,
-    shop: shopId,
-    customerName: customerName || 'Walk-in Customer',
-    customerPhone: customerPhone || '',
-    items: saleItems,
-    subtotal,
-    discount: discountValue,
-    totalAmount,
-    paidAmount: paidValue,
-    dueAmount: dueValue,
-    profit,
-    paymentMethod: paymentMethod || 'cash',
-    notes: notes || '',
-    createdBy: req.user._id,
-  });
-
-  if (inventoryLogs.length > 0) await InventoryLog.insertMany(inventoryLogs);
 
   await recordAudit(req, {
     actionType: 'CREATE_SALE',
@@ -452,7 +502,7 @@ const updateSale = asyncHandler(async (req, res) => {
 const deleteSale = asyncHandler(async (req, res) => {
   const { deleteReason, restock = false } = req.body;
   const sale = await Sale.findById(req.params.id);
-  if (!sale) throw new ApiError(404, 'Sale not found.');
+  if (!sale || sale.isDeleted) throw new ApiError(404, 'Sale not found.');
   if (req.user.role === 'manager' && sale.shop.toString() !== req.user.assignedShop._id.toString()) {
     throw new ApiError(403, 'You can only manage sales of your assigned shop.');
   }
@@ -503,6 +553,7 @@ const deleteSale = asyncHandler(async (req, res) => {
   }
 
   sale.isDeleted = true;
+  sale.restocked = !!restock;
   sale.deletedBy = req.user._id;
   sale.deletedAt = new Date();
   sale.deleteReason = deleteReason || '';
@@ -523,11 +574,97 @@ const deleteSale = asyncHandler(async (req, res) => {
   res.json(ApiResponse.ok('Sale deleted'));
 });
 
+// Re-deduct stock for a sale being restored after it had been deleted with
+// restock:true (its stock was returned at delete time). Mirrors the deduction
+// rules used by createSale so inventory stays in sync.
+const reapplySaleStock = async (sale, performedBy) => {
+  const logs = [];
+  for (const item of sale.items) {
+    const product = await Product.findById(item.product);
+    if (!product || product.isDeleted) {
+      throw new ApiError(400, `Product "${item.productName}" is no longer available; cannot restore this sale.`);
+    }
+    const beforeQty = product.quantity;
+
+    if (item.foamQty || item.pillowQty || item.coverQty) {
+      const foamQty = Number(item.foamQty) || 0;
+      const pillowQty = Number(item.pillowQty) || 0;
+      const coverQty = Number(item.coverQty) || 0;
+      if ((product.quantity || 0) < foamQty || (product.pillowStock || 0) < pillowQty || (product.coverStock || 0) < coverQty) {
+        throw new ApiError(400, `Insufficient stock to restore sale ${sale.invoiceNo}.`);
+      }
+      product.quantity -= foamQty;
+      product.pillowStock -= pillowQty;
+      product.coverStock -= coverQty;
+    } else if (Array.isArray(item.variants) && item.variants.length > 0) {
+      const qty = Number(item.quantity) || 0;
+      if (variantTotal(product.variants) + 1e-9 < qty) {
+        throw new ApiError(400, `Insufficient stock to restore sale ${sale.invoiceNo}.`);
+      }
+      product.variants = drainVariants(product.variants, qty).variants;
+      product.quantity = variantTotal(product.variants);
+    } else if (item.carpetPiece) {
+      const pieces = Array.isArray(product.carpetPiecesData) ? product.carpetPiecesData : [];
+      const idx = pieces.findIndex(
+        (p) =>
+          Math.abs(Number(p.width) - Number(item.carpetPiece.width)) < 0.05 &&
+          Math.abs(Number(p.height) - Number(item.carpetPiece.height)) < 0.05
+      );
+      if (idx >= 0) pieces.splice(idx, 1);
+      product.carpetPiecesData = pieces;
+      product.carpetPieces = pieces.length;
+      const area = Number(item.carpetPiece.area) || Number(item.carpetPiece.width) * Number(item.carpetPiece.height);
+      if (Number(product.quantity || 0) + 1e-9 < area) {
+        throw new ApiError(400, `Insufficient stock to restore sale ${sale.invoiceNo}.`);
+      }
+      product.quantity = Number(product.quantity || 0) - area;
+    } else if (item.length) {
+      const len = Number(item.length) || 0;
+      if (Number(product.meterLength || 0) + 1e-9 < len) {
+        throw new ApiError(400, `Insufficient stock to restore sale ${sale.invoiceNo}.`);
+      }
+      product.meterLength = Number(product.meterLength || 0) - len;
+      product.quantity = Math.max(0, Number(product.quantity || 0) - len);
+    } else {
+      const qty = Number(item.quantity) || 0;
+      if (Number(product.quantity || 0) + 1e-9 < qty) {
+        throw new ApiError(400, `Insufficient stock to restore sale ${sale.invoiceNo}.`);
+      }
+      product.quantity = Number(product.quantity || 0) - qty;
+    }
+
+    await product.save();
+    logs.push({
+      shop: sale.shop,
+      product: item.product,
+      productName: item.productName,
+      actionType: 'stock_out',
+      previousStock: beforeQty,
+      newStock: product.quantity,
+      quantity: item.quantity,
+      reason: `Sale ${sale.invoiceNo} restored`,
+      performedBy,
+      notes: item.carpetPiece ? 'Re-applied carpet piece sale' : '',
+    });
+  }
+  if (logs.length > 0) await InventoryLog.insertMany(logs);
+};
+
 const restoreSale = asyncHandler(async (req, res) => {
   const sale = await Sale.findById(req.params.id);
   if (!sale) throw new ApiError(404, 'Sale not found.');
+  if (req.user.role === 'manager' && sale.shop.toString() !== req.user.assignedShop._id.toString()) {
+    throw new ApiError(403, 'You can only manage sales of your assigned shop.');
+  }
+
+  // A sale deleted with restock:true had its stock returned; restoring it must
+  // deduct that stock again, otherwise inventory stays inflated.
+  if (sale.restocked) {
+    await reapplySaleStock(sale, req.user._id);
+  }
 
   sale.isDeleted = false;
+  sale.restocked = false;
   sale.deletedBy = null;
   sale.deletedAt = null;
   sale.deleteReason = '';
