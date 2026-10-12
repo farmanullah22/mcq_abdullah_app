@@ -8,6 +8,12 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
+// Trust exactly one reverse proxy (Nginx) so req.ip reflects the real client
+// from X-Forwarded-For instead of the proxy address. Nginx must be the only
+// path to this server; never expose the Node port directly, otherwise clients
+// could spoof X-Forwarded-For and bypass IP-based rate limiting.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 // Keep the raw request bytes so WhatsApp webhook signatures can be verified.
