@@ -367,16 +367,17 @@ const createSale = asyncHandler(async (req, res) => {
     }))
   );
 
-  // Send the PDF receipt to the customer's WhatsApp number (if one is given
-  // and WhatsApp is configured). Failures never affect the sale itself.
-  // Attach each item's product image so the receipt can render thumbnails.
-  await sale.populate({ path: 'items.product', select: 'images' });
-  const whatsappService = require('../services/whatsappService');
-  const receipt = await whatsappService.sendWhatsAppReceipt(sale, sale.customerPhone);
-  sale.whatsappReceipt = receipt;
-  // Persist the delivery status; previously the result was computed but never
-  // saved, so the app and webhook had nothing to read.
-  await sale.save();
+  // [PENDING - WhatsApp automatic invoice delivery disabled per client request]
+  // // Send the PDF receipt to the customer's WhatsApp number (if one is given
+  // // and WhatsApp is configured). Failures never affect the sale itself.
+  // // Attach each item's product image so the receipt can render thumbnails.
+  // await sale.populate({ path: 'items.product', select: 'images' });
+  // const whatsappService = require('../services/whatsappService');
+  // const receipt = await whatsappService.sendWhatsAppReceipt(sale, sale.customerPhone);
+  // sale.whatsappReceipt = receipt;
+  // // Persist the delivery status; previously the result was computed but never
+  // // saved, so the app and webhook had nothing to read.
+  // await sale.save();
 
   // Link the sale to a registered customer (matched by phone) and update
   // their purchase history. Credit sales also increase the outstanding due.
