@@ -37,7 +37,7 @@
 - If missing → `unauthenticated` → `LoginScreen`
 
 ---
-
+jdfksdjfkdsjflksjflkdsjflkjskdj
 ## 3. Navigation Structure
 
 ### HomeShell (`home_shell.dart`)
