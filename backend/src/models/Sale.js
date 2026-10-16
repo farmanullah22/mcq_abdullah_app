@@ -28,6 +28,9 @@ const saleItemSchema = new mongoose.Schema(
     unitPrice: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     costPrice: { type: Number, default: 0 },
+    // Picture captured (gallery/camera) at sale time, stored as a base64 data
+    // URL so the invoice and receipt can show the sold product.
+    image: { type: String, default: '' },
     foamQty: { type: Number, default: 0, min: 0 },
     pillowQty: { type: Number, default: 0, min: 0 },
     coverQty: { type: Number, default: 0, min: 0 },

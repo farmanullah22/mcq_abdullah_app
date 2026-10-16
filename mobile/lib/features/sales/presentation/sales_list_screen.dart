@@ -293,6 +293,19 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                     ].join(' · '),
                     style: theme.textTheme.bodySmall,
                   ),
+                  if (sale.shopAddress.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 13, color: AppColors.gold),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(sale.shopAddress, style: theme.textTheme.bodySmall),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,

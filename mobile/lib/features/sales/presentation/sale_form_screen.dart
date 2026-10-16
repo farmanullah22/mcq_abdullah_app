@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/repository_providers.dart';
@@ -33,8 +37,22 @@ class _CartItem {
   int pillowQty = 0;
   int coverQty = 0;
   double sellingPrice = 0;
+  String image = '';
+  String color = '';
 
   String get _type => product.productType;
+
+  /// Foam Cover, Pillow Cover and the re-designed Carpet stock their pieces per
+  /// colour, so the manager must say which colour is being sold.
+  bool get _hasColors => product.variants.isNotEmpty;
+
+  /// Stock available for the colour the manager picked (0 until one is chosen).
+  int get colorStock {
+    final match = product.variants
+        .where((v) => v.color.toLowerCase() == color.toLowerCase())
+        .firstOrNull;
+    return match?.quantity ?? 0;
+  }
 
   /// Old carpets were sold by area (width x height); the re-designed carpet is
   /// sold by pieces like the other three products.
@@ -67,6 +85,7 @@ class _CartItem {
     if (_isAreaCarpet) return width > 0 && height > 0;
     if (_type == 'meter') return length > 0;
     if (_isFoamBundle) return qty + pillowQty + coverQty > 0;
+    if (_hasColors && color.isEmpty) return false;
     return qty > 0;
   }
 }
@@ -82,6 +101,8 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
   String? _shopId;
 
   Product? _selectedProduct;
+
+  final _imagePicker = ImagePicker();
 
   List<Customer> _customers = [];
   String? _selectedCustomerId;
@@ -385,6 +406,11 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
                             setState(() => _cart.removeAt(e.$1));
                             _syncPaidToTotal();
                           },
+                          onPickGallery: () =>
+                              _pickItemImage(e.$2, ImageSource.gallery),
+                          onPickCamera: () =>
+                              _pickItemImage(e.$2, ImageSource.camera),
+                          onRemoveImage: () => setState(() => e.$2.image = ''),
                         ),
                       ),
                     ],
@@ -506,10 +532,33 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
     );
   }
 
+  String _buildImageDataUrl(Uint8List bytes) {
+    final ext = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50 ? 'png' : 'jpeg';
+    return 'data:image/$ext;base64,${base64.encode(bytes)}';
+  }
+
+  Future<void> _pickItemImage(_CartItem item, ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(source: source, imageQuality: 70);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() => item.image = _buildImageDataUrl(bytes));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not pick image: $e')),
+      );
+    }
+  }
+
   void _addToCart(Product product) {
     setState(() {
+      // Coloured products can sit on several cart lines (one per colour), so a
+      // line is only reused while it still has no colour picked. Plain products
+      // keep a single line as before.
       final existing = _cart
-          .where((c) => c.product.id == product.id)
+          .where((c) => c.product.id == product.id && c.color.isEmpty)
           .firstOrNull;
       if (existing == null) {
         final item = _CartItem(product);
@@ -543,6 +592,19 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
       );
       return;
     }
+    final overColor = _cart
+        .where((c) => c._hasColors && c.qty > c.colorStock)
+        .firstOrNull;
+    if (overColor != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Only ${overColor.colorStock} pieces of ${overColor.color} are in stock.',
+          ),
+        ),
+      );
+      return;
+    }
     final sale = await ref
         .read(saleMutationControllerProvider.notifier)
         .create(
@@ -556,6 +618,7 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
                         'foamQty': c.qty,
                         'pillowQty': c.pillowQty,
                         'coverQty': c.coverQty,
+                        'image': c.image,
                       }
                     : c._isAreaCarpet
                     ? {
@@ -564,11 +627,14 @@ class _SaleFormScreenState extends ConsumerState<SaleFormScreen> {
                         'unitPrice': c.unitPrice,
                         'width': c.width,
                         'height': c.height,
+                        'image': c.image,
                       }
                     : {
                         'productId': c.product.id,
                         'quantity': c.quantity,
                         'unitPrice': c.unitPrice,
+                        'image': c.image,
+                        if (c.color.isNotEmpty) 'color': c.color,
                       },
               )
               .toList(),
@@ -611,11 +677,17 @@ class _CartEditor extends StatelessWidget {
     required this.item,
     required this.onChanged,
     required this.onRemove,
+    required this.onPickGallery,
+    required this.onPickCamera,
+    required this.onRemoveImage,
   });
 
   final _CartItem item;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
+  final VoidCallback onPickGallery;
+  final VoidCallback onPickCamera;
+  final VoidCallback onRemoveImage;
 
   @override
   Widget build(BuildContext context) {
@@ -652,7 +724,41 @@ class _CartEditor extends StatelessWidget {
               ),
             ],
           ),
+          if (item._hasColors) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: item.color.isEmpty ? null : item.color,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Colour',
+                prefixIcon: Icon(Icons.palette_outlined),
+                isDense: true,
+              ),
+              hint: const Text('Select colour'),
+              items: item.product.variants
+                  .where((v) => v.quantity > 0)
+                  .map(
+                    (v) => DropdownMenuItem(
+                      value: v.color,
+                      child: Text(
+                        '${v.color} (${v.quantity} in stock)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => update(() => item.color = v ?? ''),
+            ),
+          ],
           const SizedBox(height: 8),
+          _ItemImagePicker(
+            image: item.image,
+            onPickGallery: onPickGallery,
+            onPickCamera: onPickCamera,
+            onRemove: onRemoveImage,
+          ),
+          const SizedBox(height: 10),
           if (item._isAreaCarpet)
             Row(
               children: [
@@ -747,7 +853,7 @@ class _CartEditor extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${item.quantity.toStringAsFixed(2)} ${item._isAreaCarpet
+                '${item.color.isNotEmpty ? '${item.color} · ' : ''}${item.quantity.toStringAsFixed(2)} ${item._isAreaCarpet
                     ? 'sqft'
                     : type == 'meter'
                     ? 'm'
@@ -766,6 +872,79 @@ class _CartEditor extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ItemImagePicker extends StatelessWidget {
+  const _ItemImagePicker({
+    required this.image,
+    required this.onPickGallery,
+    required this.onPickCamera,
+    required this.onRemove,
+  });
+
+  final String image;
+  final VoidCallback onPickGallery;
+  final VoidCallback onPickCamera;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _decodeImageBytes(image);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+          ),
+          child: bytes == null
+              ? const Icon(Icons.image_outlined, color: AppColors.primary, size: 22)
+              : Image.memory(bytes, fit: BoxFit.cover),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onPickGallery,
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+                label: const Text('Choose Picture'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onPickCamera,
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Camera'),
+              ),
+              if (bytes != null)
+                TextButton.icon(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
+                  label: const Text('Remove', style: TextStyle(color: AppColors.danger)),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Uint8List? _decodeImageBytes(String data) {
+  if (data.isEmpty) return null;
+  try {
+    final comma = data.indexOf(',');
+    final base64 = data.startsWith('data:') && comma >= 0 ? data.substring(comma + 1) : data;
+    return base64Decode(base64);
+  } catch (_) {
+    return null;
   }
 }
 

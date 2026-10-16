@@ -72,6 +72,8 @@ class Sale {
   final String invoiceNo;
   final String shopId;
   final String shopName;
+  final String shopAddress;
+  final String shopContact;
   final String customerName;
   final String customerPhone;
   final List<SaleItem> items;
@@ -93,6 +95,8 @@ class Sale {
     required this.invoiceNo,
     required this.shopId,
     this.shopName = '',
+    this.shopAddress = '',
+    this.shopContact = '',
     this.customerName = 'Walk-in Customer',
     this.customerPhone = '',
     this.items = const [],
@@ -116,9 +120,13 @@ class Sale {
     final shop = json['shop'];
     String sId = (json['shopId'] ?? json['shop'])?.toString() ?? '';
     String sName = '';
+    String sAddress = '';
+    String sContact = '';
     if (shop is Map<String, dynamic>) {
       sId = (shop['id'] ?? shop['_id']).toString();
       sName = shop['name']?.toString() ?? '';
+      sAddress = shop['address']?.toString() ?? '';
+      sContact = shop['contactNumber']?.toString() ?? '';
     }
     final createdBy = json['createdBy'];
     String cbId = '';
@@ -135,6 +143,8 @@ class Sale {
       invoiceNo: json['invoiceNo']?.toString() ?? '',
       shopId: sId,
       shopName: sName,
+      shopAddress: sAddress,
+      shopContact: sContact,
       customerName: json['customerName']?.toString() ?? 'Walk-in Customer',
       customerPhone: json['customerPhone']?.toString() ?? '',
       items: (json['items'] as List?)

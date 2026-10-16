@@ -8,7 +8,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const { recordAudit } = require('../middleware/auth');
 const { getWarehouseShop } = require('../utils/warehouse');
-const { hasVariants, drainVariants, isVariantType, variantTotal, mergeVariants } = require('../utils/variants');
+const { hasVariants, drainVariants, subtractVariants, isVariantType, variantTotal, mergeVariants } = require('../utils/variants');
 
 const generateInvoiceNo = async () => {
   const date = new Date();
@@ -39,7 +39,7 @@ const listSales = asyncHandler(async (req, res) => {
 
   const [sales, total] = await Promise.all([
     Sale.find(filter)
-      .populate('shop', 'name')
+      .populate('shop', 'name address contactNumber')
       .populate('createdBy', 'name role')
       // Managers must not see profit margins or cost prices.
       .select(req.user.role === 'manager' ? '-profit -items.costPrice' : '')
@@ -105,6 +105,16 @@ const createSale = asyncHandler(async (req, res) => {
   let profit = 0;
 
   const invoiceNo = await generateInvoiceNo();
+
+  // Drain the pieces for one sold line. When the manager picked a colour, take
+  // exactly that colour (subtractVariants checks it exists and has enough);
+  // otherwise fall back to draining the biggest colour rows first.
+  const drainForSale = (product, qty, item) => {
+    const color = String(item.color || '').trim();
+    return color
+      ? subtractVariants(product.variants, [{ color, quantity: qty }])
+      : drainVariants(product.variants, qty);
+  };
 
   for (const item of items) {
     const cacheKey = String(item.productId);
@@ -173,6 +183,7 @@ const createSale = asyncHandler(async (req, res) => {
         unitPrice,
         totalAmount: itemTotal,
         costPrice: product.costPrice,
+        image: item.image || '',
         foamQty,
         pillowQty,
         coverQty,
@@ -237,7 +248,7 @@ const createSale = asyncHandler(async (req, res) => {
             `Insufficient stock for "${product.name}" (only ${variantTotal(product.variants)} pieces left).`
           );
         }
-        const drained = drainVariants(product.variants, qty);
+        const drained = drainForSale(product, qty, item);
         product.variants = drained.variants;
         product.quantity = variantTotal(product.variants);
         soldVariants = drained.moved;
@@ -279,7 +290,7 @@ const createSale = asyncHandler(async (req, res) => {
           `Insufficient stock for "${product.name}" (only ${variantTotal(product.variants)} pieces left).`
         );
       }
-      const drained = drainVariants(product.variants, qty);
+      const drained = drainForSale(product, qty, item);
       product.variants = drained.variants;
       product.quantity = variantTotal(product.variants);
       soldVariants = drained.moved;
@@ -303,6 +314,7 @@ const createSale = asyncHandler(async (req, res) => {
       unitPrice,
       totalAmount: itemTotal,
       costPrice: product.costPrice,
+      image: item.image || '',
       foamQty: 0,
       pillowQty: 0,
       coverQty: 0,

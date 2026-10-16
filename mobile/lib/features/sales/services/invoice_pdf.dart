@@ -59,6 +59,27 @@ class InvoicePdf {
                   sale.shopName,
                   style: const pw.TextStyle(fontSize: 11, color: PdfColors.white),
                 ),
+              if (sale.shopAddress.isNotEmpty) ...[
+                pw.SizedBox(height: 3),
+                pw.SizedBox(
+                  width: 220,
+                  child: pw.Text(
+                    sale.shopAddress,
+                    style: const pw.TextStyle(
+                      fontSize: 8.5,
+                      color: PdfColors.grey300,
+                      lineSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+              if (sale.shopContact.isNotEmpty) ...[
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  sale.shopContact,
+                  style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey300),
+                ),
+              ],
             ],
           ),
           pw.Column(
