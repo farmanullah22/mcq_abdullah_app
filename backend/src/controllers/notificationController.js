@@ -48,6 +48,12 @@ const deleteNotification = asyncHandler(async (req, res) => {
   res.json(ApiResponse.ok('Notification deleted'));
 });
 
+// Removes every notification belonging to the signed-in user.
+const deleteAllNotifications = asyncHandler(async (req, res) => {
+  const result = await Notification.deleteMany({ user: req.user._id });
+  res.json(ApiResponse.ok('All notifications deleted', { deleted: result.deletedCount || 0 }));
+});
+
 const registerToken = asyncHandler(async (req, res) => {
   const { fcmToken } = req.body;
   if (!fcmToken) throw new (require('../utils/ApiError'))(400, 'fcmToken is required.');
@@ -56,4 +62,4 @@ const registerToken = asyncHandler(async (req, res) => {
   res.json(ApiResponse.ok('Push token registered'));
 });
 
-module.exports = { listNotifications, unreadCount, markRead, markAllRead, deleteNotification, registerToken };
+module.exports = { listNotifications, unreadCount, markRead, markAllRead, deleteNotification, deleteAllNotifications, registerToken };

@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../data/notification_repository.dart';
-import '../models/app_notification.dart';
 
 class NotificationListState {
   final AsyncValue<NotificationPage> data;
@@ -34,7 +33,7 @@ class NotificationController extends Notifier<NotificationListState> {
       await ref.read(notificationRepositoryProvider).markRead(id);
       final page = state.data.value;
       if (page != null) {
-        final updated = page.notifications.map((n) => n.id == id ? AppNotification(id: n.id, title: n.title, body: n.body, type: n.type, isRead: true, data: n.data, createdAt: n.createdAt) : n).toList();
+        final updated = page.notifications.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList();
         state = NotificationListState(
           data: AsyncValue.data(NotificationPage(
             notifications: updated,
@@ -54,7 +53,7 @@ class NotificationController extends Notifier<NotificationListState> {
       await ref.read(notificationRepositoryProvider).markAllRead();
       final page = state.data.value;
       if (page != null) {
-        final updated = page.notifications.map((n) => AppNotification(id: n.id, title: n.title, body: n.body, type: n.type, isRead: true, data: n.data, createdAt: n.createdAt)).toList();
+        final updated = page.notifications.map((n) => n.copyWith(isRead: true)).toList();
         state = NotificationListState(
           data: AsyncValue.data(NotificationPage(notifications: updated, unread: 0, total: page.total, page: page.page, totalPages: page.totalPages)),
           unread: 0,
@@ -80,6 +79,27 @@ class NotificationController extends Notifier<NotificationListState> {
         );
       }
     } catch (_) {}
+  }
+
+  /// Deletes every notification of the signed-in user and empties the list.
+  Future<bool> deleteAll() async {
+    try {
+      await ref.read(notificationRepositoryProvider).deleteAll();
+      state = NotificationListState(
+        data: AsyncValue.data(NotificationPage(
+          notifications: const [],
+          unread: 0,
+          total: 0,
+          page: 1,
+          totalPages: 1,
+        )),
+        unread: 0,
+      );
+      ref.read(unreadCountProvider.notifier).clear();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> decrementUnread() async {

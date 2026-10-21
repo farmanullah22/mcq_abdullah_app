@@ -206,8 +206,10 @@ const stockIn = asyncHandler(async (req, res) => {
     module: 'inventory',
     recordId: product._id,
     recordType: 'Product',
-    oldData: { quantity: previousStock },
+    oldData: { productName: product.name, sku: product.sku, quantity: previousStock },
     newData: {
+      productName: product.name,
+      sku: product.sku,
       quantity: product.quantity,
       stockIn: Math.round(addedQty),
       carpetPieces: logPieces.length ? logPieces : undefined,
@@ -372,8 +374,10 @@ const stockOut = asyncHandler(async (req, res) => {
     module: 'inventory',
     recordId: product._id,
     recordType: 'Product',
-    oldData: { quantity: previousStock },
+    oldData: { productName: product.name, sku: product.sku, quantity: previousStock },
     newData: {
+      productName: product.name,
+      sku: product.sku,
       quantity: product.quantity,
       stockOut: Math.round(removedQty),
       carpetPieces: logPieces.length ? logPieces : undefined,
@@ -647,8 +651,15 @@ const transferStock = asyncHandler(async (req, res) => {
     module: 'inventory',
     recordId: fromProduct._id,
     recordType: 'Product',
-    oldData: { fromQuantity: fromProduct.quantity + moveQty, toQuantity: toProduct.quantity - moveQty },
+    oldData: {
+      productName: fromProduct.name,
+      sku: fromProduct.sku,
+      fromQuantity: fromProduct.quantity + moveQty,
+      toQuantity: toProduct.quantity - moveQty,
+    },
     newData: {
+      productName: fromProduct.name,
+      sku: fromProduct.sku,
       fromQuantity: fromProduct.quantity,
       toQuantity: toProduct.quantity,
       transferred: Math.round(moveQty),
@@ -715,6 +726,7 @@ const inventoryHistory = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 30;
   const filter = {};
+  if (req.query.shopId) filter.shop = req.query.shopId;
   if (req.user.role === 'manager') filter.shop = req.user.assignedShop._id;
   else if (req.shopId) filter.shop = req.shopId;
   if (req.query.actionType) filter.actionType = req.query.actionType;

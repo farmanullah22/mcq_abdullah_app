@@ -66,13 +66,37 @@ const createExpense = asyncHandler(async (req, res) => {
   const shop = await Shop.findById(shopId);
   const admins = await User.find({ role: 'admin', isActive: true });
   if (admins.length) {
+    // Same detail payload the manager-action notifications use, so the admin
+    // sees the category, the amount and the description.
+    const { describeChange } = require('../services/changeDetails');
+    const expenseDetail = describeChange({
+      actionType: 'CREATE_EXPENSE',
+      recordType: 'Expense',
+      oldData: null,
+      newData: expense.toObject(),
+    });
+    const shopName = shop ? shop.name : '';
     await Notification.insertMany(
       admins.map((admin) => ({
         user: admin._id,
         title: 'Expense Recorded',
-        body: `Rs. ${amount} ${category} expense recorded${shop ? ` at ${shop.name}` : ''}`,
+        body: `Rs. ${amount} ${category} expense recorded${shopName ? ` at ${shopName}` : ''}`,
         type: 'expense_alert',
-        data: { expenseId: expense._id },
+        data: {
+          expenseId: expense._id,
+          actionType: 'CREATE_EXPENSE',
+          module: 'expenses',
+          recordType: 'Expense',
+          recordId: String(expense._id),
+          shopId: shopId ? String(shopId) : null,
+          shopName,
+          performedByName: req.user ? req.user.name : '',
+          performedById: req.user ? String(req.user._id) : null,
+          identity: expenseDetail.identity,
+          facts: expenseDetail.facts,
+          changes: expenseDetail.changes,
+          itemLines: expenseDetail.itemLines,
+        },
       }))
     );
   }

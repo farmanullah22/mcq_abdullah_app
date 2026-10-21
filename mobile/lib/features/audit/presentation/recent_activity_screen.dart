@@ -12,14 +12,17 @@ const _gold = Color(0xFFD4AF37);
 const _goldLight = Color(0xFFF7D488);
 const _bg = Color(0xFF0B0B0F);
 
-/// Merged feed of stock movements and audit activity, scoped to the
-/// current user's branch (managers) or all branches (admins).
-final recentActivityProvider = FutureProvider<List<ActivityItem>>((ref) async {
+/// Merged feed of stock movements and audit activity.
+///
+/// Passing a [shopId] scopes the feed to a single branch (used by the admin
+/// dashboard's "view branch logs" button). Leaving it null falls back to the
+/// current user's branch for managers, or every branch for admins.
+final recentActivityProvider = FutureProvider.family<List<ActivityItem>, String?>((ref, branchId) async {
   final user = ref.watch(currentUserProvider);
   final isAdmin = user?.isAdmin ?? false;
-  final shopId = isAdmin ? null : user?.assignedShopId;
+  final shopId = branchId ?? (isAdmin ? null : user?.assignedShopId);
 
-  final invFuture = ref.read(inventoryRepositoryProvider).history(limit: 80);
+  final invFuture = ref.read(inventoryRepositoryProvider).history(shopId: shopId, limit: 80);
   final auditFuture = ref.read(auditRepositoryProvider).getLogs(shopId: shopId, limit: 80);
   final (inventory, audit) = await (invFuture, auditFuture).wait;
 
@@ -37,12 +40,18 @@ final recentActivityProvider = FutureProvider<List<ActivityItem>>((ref) async {
         time: l.date?.toIso8601String(),
       ),
     for (final a in audit.logs)
-      ActivityItem(
-        type: a.actionType,
-        title: a.remarks.isNotEmpty ? a.remarks : a.actionType,
-        subtitle: [a.performedByName, a.shopName].where((s) => s.isNotEmpty).join(' · '),
-        time: a.timestamp?.toIso8601String(),
-      ),
+      // A branch feed is about what changed in the branch, so the noisy
+      // sign-in / sign-out entries are left out of it.
+      if (branchId == null || !_isSessionEvent(a.actionType))
+        ActivityItem(
+          type: a.actionType,
+          title: a.remarks.isNotEmpty ? a.remarks : a.actionType,
+          subtitle: [a.performedByName, a.shopName].where((s) => s.isNotEmpty).join(' · '),
+          time: a.timestamp?.toIso8601String(),
+          changes: a.changes,
+          facts: a.facts,
+          itemLines: a.itemLines,
+        ),
   ];
 
   items.sort((a, b) {
@@ -53,12 +62,25 @@ final recentActivityProvider = FutureProvider<List<ActivityItem>>((ref) async {
   return items.take(100).toList();
 });
 
+/// Login / logout / report-download entries carry no business change.
+bool _isSessionEvent(String actionType) {
+  final t = actionType.toUpperCase();
+  return t == 'LOGIN' || t == 'LOGOUT' || t.contains('REPORT_DOWNLOAD');
+}
+
 class RecentActivityScreen extends ConsumerWidget {
-  const RecentActivityScreen({super.key});
+  const RecentActivityScreen({super.key, this.shopId, this.shopName});
+
+  /// When set, the feed is scoped to this branch only.
+  final String? shopId;
+
+  /// Display name of the branch being viewed (optional).
+  final String? shopName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activity = ref.watch(recentActivityProvider);
+    final provider = recentActivityProvider(shopId);
+    final activity = ref.watch(provider);
 
     return Scaffold(
       backgroundColor: _bg,
@@ -71,25 +93,25 @@ class RecentActivityScreen extends ConsumerWidget {
               loading: () => const LuxLoadingView(message: 'Loading activity...'),
               error: (e, st) => LuxErrorView(
                 message: e.toString(),
-                onRetry: () => ref.refresh(recentActivityProvider),
+                onRetry: () => ref.refresh(provider),
               ),
               data: (items) => RefreshIndicator(
                 color: _gold,
                 backgroundColor: const Color(0xFF16141B),
                 onRefresh: () async {
-                  ref.invalidate(recentActivityProvider);
-                  await ref.read(recentActivityProvider.future);
+                  ref.invalidate(provider);
+                  await ref.read(provider.future);
                 },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
                   children: [
                     _ActivityTopBar(
-                      onRefresh: () => ref.refresh(recentActivityProvider),
+                      onRefresh: () => ref.refresh(provider),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Recent Activity',
+                      shopName ?? 'Recent Activity',
                       style: GoogleFonts.playfairDisplay(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
@@ -98,7 +120,9 @@ class RecentActivityScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Latest stock movements and changes',
+                      shopName != null
+                          ? 'All recent logs for this branch'
+                          : 'Latest stock movements and changes',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.5),

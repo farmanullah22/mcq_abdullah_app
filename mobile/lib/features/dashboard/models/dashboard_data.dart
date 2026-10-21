@@ -1,3 +1,5 @@
+import '../../../core/models/change_detail.dart';
+
 class ChartPoint {
   final String label;
   final double sales;
@@ -145,14 +147,30 @@ class ActivityItem {
   final String title;
   final String subtitle;
   final String? time;
+  final List<ChangeDetail> changes;
+  final List<ChangeFact> facts;
+  final List<String> itemLines;
 
-  const ActivityItem({required this.type, this.title = '', this.subtitle = '', this.time});
+  const ActivityItem({
+    required this.type,
+    this.title = '',
+    this.subtitle = '',
+    this.time,
+    this.changes = const [],
+    this.facts = const [],
+    this.itemLines = const [],
+  });
+
+  bool get hasDetails => changes.isNotEmpty || facts.isNotEmpty || itemLines.isNotEmpty;
 
   factory ActivityItem.fromJson(Map<String, dynamic> json) => ActivityItem(
         type: json['type']?.toString() ?? '',
         title: json['title']?.toString() ?? '',
         subtitle: json['subtitle']?.toString() ?? '',
         time: json['time']?.toString(),
+        changes: parseChangeDetails(json['changes']),
+        facts: parseChangeFacts(json['facts']),
+        itemLines: parseItemLines(json['itemLines']),
       );
 }
 

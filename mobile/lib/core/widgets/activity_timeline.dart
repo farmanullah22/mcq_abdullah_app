@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/dashboard/models/dashboard_data.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
+import 'change_details_view.dart';
 
 /// Maps an audit actionType to a visual (icon, color).
 ({IconData icon, Color color}) activityStyle(String type) {
@@ -158,6 +159,25 @@ class _ActivityRow extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ],
+                  // The exact breakdown of the change: what was added, edited
+                  // or deleted, with the old and the new value.
+                  if (item.hasDetails) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ChangeDetailsView(
+                        changes: item.changes,
+                        facts: item.facts,
+                        itemLines: item.itemLines,
+                        dense: true,
                       ),
                     ),
                   ],

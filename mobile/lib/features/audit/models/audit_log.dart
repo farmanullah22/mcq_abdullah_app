@@ -1,3 +1,5 @@
+import '../../../core/models/change_detail.dart';
+
 class AuditLog {
   final String id;
   final String actionType;
@@ -16,6 +18,9 @@ class AuditLog {
   final String platform;
   final String remarks;
   final String status;
+  final List<ChangeDetail> changes;
+  final List<ChangeFact> facts;
+  final List<String> itemLines;
 
   const AuditLog({
     required this.id,
@@ -35,6 +40,9 @@ class AuditLog {
     this.platform = '',
     this.remarks = '',
     this.status = 'success',
+    this.changes = const [],
+    this.facts = const [],
+    this.itemLines = const [],
   });
 
   factory AuditLog.fromJson(Map<String, dynamic> json) {
@@ -75,6 +83,9 @@ class AuditLog {
       platform: platform,
       remarks: json['remarks']?.toString() ?? '',
       status: json['status']?.toString() ?? 'success',
+      changes: parseChangeDetails(json['changes']),
+      facts: parseChangeFacts(json['facts']),
+      itemLines: parseItemLines(json['itemLines']),
     );
   }
 }

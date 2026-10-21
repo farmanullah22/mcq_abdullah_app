@@ -4,6 +4,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const { verifyToken, parseDeviceInfo } = require('../utils/jwt');
 const AuditLog = require('../models/AuditLog');
 const { Types } = require('mongoose');
+const { describeChange } = require('../services/changeDetails');
+const { notifyAdminsOfChange } = require('../services/adminNotificationService');
 
 const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -60,7 +62,11 @@ const scopedShop = asyncHandler(async (req, res, next) => {
 
 const recordAudit = async (req, log) => {
   try {
-    await AuditLog.create({
+    // Human readable description of what changed - stored on the audit log and
+    // pushed to the admins as a notification.
+    const detail = describeChange(log);
+
+    const created = await AuditLog.create({
       actionType: log.actionType,
       module: log.module,
       recordType: log.recordType || '',
@@ -76,9 +82,19 @@ const recordAudit = async (req, log) => {
       deviceInfo: req.deviceInfo || {},
       remarks: log.remarks || '',
       status: log.status || 'success',
+      facts: detail.facts,
+      changes: detail.changes,
+      itemLines: detail.itemLines,
     });
+
+    // A manager changing something in their branch / warehouse must be visible
+    // to the admin with the full details of what was added, edited or deleted.
+    await notifyAdminsOfChange({ req, log: created, detail });
+
+    return created;
   } catch (err) {
     console.error('Failed to write audit log:', err.message);
+    return null;
   }
 };
 

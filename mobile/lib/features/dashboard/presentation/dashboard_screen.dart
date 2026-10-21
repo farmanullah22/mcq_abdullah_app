@@ -12,6 +12,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/carpet_pattern.dart';
 import '../../auth/models/user.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../audit/presentation/recent_activity_screen.dart';
 import '../../categories/presentation/category_screen.dart';
 import '../../expenses/presentation/expense_form_screen.dart';
 import '../../inventory/presentation/stock_screens.dart';
@@ -109,6 +110,19 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// Opens the full activity log of a single branch.
+  void _openBranchActivity(BuildContext context, ShopComparison branch) {
+    if (branch.shopId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RecentActivityScreen(
+          shopId: branch.shopId,
+          shopName: branch.shopName ?? 'Branch',
+        ),
+      ),
+    );
+  }
+
   void _openLowStock(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const LowStockScreen()),
@@ -125,7 +139,11 @@ class DashboardScreen extends ConsumerWidget {
       if (data.comparison.isEmpty)
         _RevenueCard(data: data)
       else
-        _BranchSlider(branches: data.comparison, onOpen: (c) => _openShop(context, c)),
+        _BranchSlider(
+          branches: data.comparison,
+          onOpen: (c) => _openShop(context, c),
+          onActivity: (c) => _openBranchActivity(context, c),
+        ),
       if (data.comparison.isNotEmpty) ...[
         const SizedBox(height: 26),
         const _SectionTitle(
@@ -137,6 +155,7 @@ class DashboardScreen extends ConsumerWidget {
           _BranchQuickCard(
             branch: branch,
             onOpen: () => _openShop(context, branch),
+            onActivity: () => _openBranchActivity(context, branch),
           ),
       ],
       if (data.warehouse != null) ...[
@@ -1526,10 +1545,11 @@ Color _colorFromName(String name) {
 // --------------------------------------------------------------- branches --
 
 class _BranchSlider extends StatefulWidget {
-  const _BranchSlider({required this.branches, required this.onOpen});
+  const _BranchSlider({required this.branches, required this.onOpen, this.onActivity});
 
   final List<ShopComparison> branches;
   final void Function(ShopComparison branch) onOpen;
+  final void Function(ShopComparison branch)? onActivity;
 
   @override
   State<_BranchSlider> createState() => _BranchSliderState();
@@ -1568,6 +1588,7 @@ class _BranchSliderState extends State<_BranchSlider> {
                   saleCount: branch.saleCount,
                   isWarehouse: branch.isWarehouse,
                   onOpen: () => widget.onOpen(branch),
+                  onActivity: widget.onActivity == null ? null : () => widget.onActivity!(branch),
                 ),
               );
             },
@@ -1611,6 +1632,7 @@ class _BranchCard extends StatelessWidget {
     this.manager,
     this.isWarehouse = false,
     this.onOpen,
+    this.onActivity,
   });
 
   final String name;
@@ -1620,6 +1642,7 @@ class _BranchCard extends StatelessWidget {
   final int saleCount;
   final bool isWarehouse;
   final VoidCallback? onOpen;
+  final VoidCallback? onActivity;
 
   @override
   Widget build(BuildContext context) {
@@ -1725,56 +1748,67 @@ class _BranchCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(13),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(13),
-                onTap: onOpen,
-                child: Ink(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [_goldLight, _gold, _goldDark],
-                    ),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Material(
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(13),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _gold.withValues(alpha: 0.4),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Open Branch',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.4,
-                            color: const Color(0xFF17151C),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(13),
+                      onTap: onOpen,
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [_goldLight, _gold, _goldDark],
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _gold.withValues(alpha: 0.4),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Open Branch',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                  color: const Color(0xFF17151C),
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 15,
+                                color: Color(0xFF17151C),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 7),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 15,
-                          color: Color(0xFF17151C),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              _MiniActivityButton(
+                onPressed: onActivity,
+                tooltip: 'View branch logs',
+              ),
+            ],
           ),
         ],
       ),
@@ -1998,10 +2032,11 @@ class _WarehouseQuickCard extends StatelessWidget {
 }
 
 class _BranchQuickCard extends StatelessWidget {
-  const _BranchQuickCard({required this.branch, required this.onOpen});
+  const _BranchQuickCard({required this.branch, required this.onOpen, this.onActivity});
 
   final ShopComparison branch;
   final VoidCallback onOpen;
+  final VoidCallback? onActivity;
 
   @override
   Widget build(BuildContext context) {
@@ -2125,6 +2160,13 @@ class _BranchQuickCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(width: 6),
+                  if (onActivity != null) ...[
+                    _MiniActivityButton(
+                      onPressed: onActivity!,
+                      tooltip: 'View branch logs',
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Icon(
                     Icons.chevron_right_rounded,
                     size: 20,
@@ -2141,6 +2183,43 @@ class _BranchQuickCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------- quick actions --
+
+/// Small square button that opens the full activity log of a branch.
+class _MiniActivityButton extends StatelessWidget {
+  const _MiniActivityButton({required this.onPressed, this.tooltip = 'View logs'});
+
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onPressed,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: _gold.withValues(alpha: enabled ? 0.16 : 0.07),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _gold.withValues(alpha: enabled ? 0.5 : 0.22)),
+            ),
+            child: Icon(
+              Icons.history_rounded,
+              size: 17,
+              color: _goldLight.withValues(alpha: enabled ? 1 : 0.4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _QuickActionsSlider extends ConsumerWidget {
   const _QuickActionsSlider();

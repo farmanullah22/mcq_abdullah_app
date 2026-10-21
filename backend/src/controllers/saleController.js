@@ -419,15 +419,38 @@ const createSale = asyncHandler(async (req, res) => {
   // Notify admins about the new sale
   const User = require('../models/User');
   const admins = await User.find({ role: 'admin', isActive: true });
-  await Notification.insertMany(
-    admins.map((admin) => ({
-      user: admin._id,
-      title: 'New Sale',
-      body: `New sale ${invoiceNo} of Rs. ${sale.totalAmount}`,
-      type: 'new_sale',
-      data: { saleId: sale._id, invoiceNo },
-    }))
-  );
+  if (admins.length) {
+    // Same detail payload the manager-action notifications use, so the admin
+    // can see exactly what was sold and for how much.
+    const { describeChange } = require('../services/changeDetails');
+    const saleDetail = describeChange({
+      actionType: 'CREATE_SALE',
+      recordType: 'Sale',
+      oldData: null,
+      newData: sale.toObject(),
+    });
+    const saleShop = await Shop.findById(shopId).select('name').lean();
+    const shopName = saleShop ? saleShop.name : '';
+    await Notification.insertMany(
+      admins.map((admin) => ({
+        user: admin._id,
+        title: 'New Sale',
+        body: `New sale ${invoiceNo} of Rs. ${sale.totalAmount}${shopName ? ` at ${shopName}` : ''}`,
+        type: 'new_sale',
+        data: {
+          saleId: sale._id,
+          invoiceNo,
+          shopId,
+          shopName,
+          performedByName: req.user ? req.user.name : '',
+          identity: saleDetail.identity,
+          facts: saleDetail.facts,
+          changes: saleDetail.changes,
+          itemLines: saleDetail.itemLines,
+        },
+      }))
+    );
+  }
 
   // [PENDING - WhatsApp automatic invoice delivery disabled per client request]
   // // Send the PDF receipt to the customer's WhatsApp number (if one is given

@@ -6,12 +6,12 @@ class AppConstants {
   static const String appTagline = 'Business Management System';
   static const String appVersion = '1.0.0';
 
-  // Server base URL. Defaults to the production API; override for local work:
-  //   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api
+  // Server base URL. Defaults to the local development API; override for production:
+  //   flutter run --dart-define=API_BASE_URL=https://api.saisinghshope.me/api
   // (10.0.2.2 = Android emulator loopback; use http://localhost:5000/api for Windows desktop)
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.saisinghshope.me/api',
+    defaultValue: 'http://10.0.2.2:5000/api',
   );
 
   static const String currencySymbol = 'Rs.';

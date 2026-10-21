@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/change_details_view.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
 import '../models/audit_log.dart';
@@ -314,6 +315,21 @@ class AuditDetailScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            // Readable breakdown of the change - what was added, edited or
+            // deleted, with the old and the new value.
+            if (log.changes.isNotEmpty || log.facts.isNotEmpty || log.itemLines.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ChangeDetailsView(
+                    changes: log.changes,
+                    facts: log.facts,
+                    itemLines: log.itemLines,
+                  ),
+                ),
+              ),
+            ],
             if (log.oldData != null && log.oldData!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Card(

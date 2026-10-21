@@ -112,7 +112,7 @@ const getDashboard = asyncHandler(async (req, res) => {
   const recentLogs = await AuditLog.find(activityFilter)
     .sort({ timestamp: -1 })
     .limit(8)
-    .select('actionType remarks timestamp performedByName shopName');
+    .select('actionType remarks timestamp performedByName shopName changes facts itemLines');
 
   res.json(
     ApiResponse.ok('Dashboard data fetched', {
@@ -149,6 +149,9 @@ const getDashboard = asyncHandler(async (req, res) => {
         title: l.remarks || l.actionType,
         subtitle: l.shopName || (l.performedByName || ''),
         time: l.timestamp,
+        changes: l.changes || [],
+        facts: l.facts || [],
+        itemLines: l.itemLines || [],
       })),
       shops: shops.map((s) => ({ id: s._id, name: s.name, shopType: s.shopType || 'branch', manager: s.manager?.name || '—' })),
     })
@@ -180,7 +183,7 @@ const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => 
     AuditLog.find({ shopId })
       .sort({ timestamp: -1 })
       .limit(10)
-      .select('actionType remarks timestamp performedByName'),
+      .select('actionType remarks timestamp performedByName changes facts itemLines'),
     Product.find({ isDeleted: false, shop: shopId })
       .select('name sku barcode size colorStocks quantity lowStockThreshold productType')
       .sort({ createdAt: -1 })
@@ -203,6 +206,9 @@ const buildManagerPayload = async (req, shopId, productCount, lowStockCount) => 
       title: l.remarks || l.actionType,
       subtitle: l.performedByName || '',
       time: l.timestamp,
+      changes: l.changes || [],
+      facts: l.facts || [],
+      itemLines: l.itemLines || [],
     })),
   ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 

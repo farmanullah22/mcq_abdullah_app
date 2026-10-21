@@ -104,6 +104,7 @@ class InventoryRepository {
   Future<({List<InventoryLog> logs, int total})> history({
     String? actionType,
     String? productId,
+    String? shopId,
     int page = 1,
     int limit = 30,
   }) async {
@@ -113,6 +114,7 @@ class InventoryRepository {
       query: {
         'actionType': ?actionType,
         'productId': ?productId,
+        'shopId': ?shopId,
         'page': '$page',
         'limit': '$limit',
       },

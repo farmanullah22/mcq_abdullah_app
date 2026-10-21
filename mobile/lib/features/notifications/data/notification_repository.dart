@@ -52,6 +52,16 @@ class NotificationRepository {
     await _api.request('DELETE', '/notifications/$id');
   }
 
+  /// Deletes every notification of the signed-in user.
+  Future<int> deleteAll() async {
+    final res = await _api.request('DELETE', '/notifications');
+    final data = res['data'];
+    if (data is Map<String, dynamic>) {
+      return (data['deleted'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
   Future<void> registerToken(String fcmToken) async {
     await _api.request('POST', '/notifications/token', data: {'fcmToken': fcmToken});
   }
