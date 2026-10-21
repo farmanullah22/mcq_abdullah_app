@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/widgets/activity_timeline.dart';
+import '../../../core/widgets/branch_filter_bar.dart';
 import '../../../core/widgets/lux_widgets.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../dashboard/models/dashboard_data.dart';
+import '../../shops/providers/shop_providers.dart';
 
 const _gold = Color(0xFFD4AF37);
 const _goldLight = Color(0xFFF7D488);
@@ -68,7 +70,7 @@ bool _isSessionEvent(String actionType) {
   return t == 'LOGIN' || t == 'LOGOUT' || t.contains('REPORT_DOWNLOAD');
 }
 
-class RecentActivityScreen extends ConsumerWidget {
+class RecentActivityScreen extends ConsumerStatefulWidget {
   const RecentActivityScreen({super.key, this.shopId, this.shopName});
 
   /// When set, the feed is scoped to this branch only.
@@ -78,9 +80,27 @@ class RecentActivityScreen extends ConsumerWidget {
   final String? shopName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final provider = recentActivityProvider(shopId);
+  ConsumerState<RecentActivityScreen> createState() => _RecentActivityScreenState();
+}
+
+class _RecentActivityScreenState extends ConsumerState<RecentActivityScreen> {
+  late String? _shopId = widget.shopId;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final isAdmin = user?.isAdmin ?? false;
+    final provider = recentActivityProvider(_shopId);
     final activity = ref.watch(provider);
+    final shopsState = ref.watch(shopListControllerProvider);
+    final shops = shopsState.data.value ?? const [];
+
+    String? headerName = widget.shopName;
+    if (headerName == null || headerName.isEmpty) {
+      if (_shopId != null) {
+        headerName = shops.where((s) => s.id == _shopId).map((s) => s.name).firstOrNull;
+      }
+    }
 
     return Scaffold(
       backgroundColor: _bg,
@@ -111,7 +131,7 @@ class RecentActivityScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      shopName ?? 'Recent Activity',
+                      headerName ?? 'Recent Activity',
                       style: GoogleFonts.playfairDisplay(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
@@ -120,15 +140,33 @@ class RecentActivityScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      shopName != null
+                      headerName != null
                           ? 'All recent logs for this branch'
-                          : 'Latest stock movements and changes',
+                          : (isAdmin ? 'Latest stock movements and changes across all branches' : 'Latest stock movements and changes'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
+                    if (isAdmin && shops.isNotEmpty)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _gold.withValues(alpha: 0.35)),
+                        ),
+                        child: BranchFilterBar(
+                          shops: shops,
+                          selectedShopId: _shopId,
+                          onChanged: (v) {
+                            setState(() => _shopId = v);
+                          },
+                          label: 'Branch',
+                          allLabel: 'All branches',
+                        ),
+                      ),
+                    const SizedBox(height: 10),
                     const LuxGoldDivider(),
                     const SizedBox(height: 18),
                     LuxGlassCard(

@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/branch_filter_bar.dart';
 import '../../../core/widgets/change_details_view.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_views.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../shops/models/shop.dart';
+import '../../shops/providers/shop_providers.dart';
 import '../models/audit_log.dart';
 import '../providers/audit_providers.dart';
 
@@ -16,14 +20,18 @@ class AuditLogsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(auditControllerProvider);
+    final shopsState = ref.watch(shopListControllerProvider);
+    final shops = shopsState.data.value ?? const [];
+    final user = ref.watch(currentUserProvider);
+    final isAdmin = user?.isAdmin ?? true;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Audit Logs'),
+        title: Text(isAdmin && state.filter.shopId != null ? 'Audit Logs — Branch view' : 'Audit Logs'),
         actions: [
           IconButton(
             tooltip: 'Filters',
-            onPressed: () => _showFilters(context, ref, state.filter),
+            onPressed: () => _showFilters(context, ref, state.filter, shops),
             icon: const Icon(Icons.filter_list),
           ),
           IconButton(
@@ -35,6 +43,16 @@ class AuditLogsScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          if (isAdmin)
+            BranchFilterBar(
+              shops: shops,
+              selectedShopId: state.filter.shopId,
+              onChanged: (shopId) => ref.read(auditControllerProvider.notifier).setFilter(
+                    state.filter.copyWith(shopId: shopId),
+                  ),
+              label: 'Branch',
+              allLabel: 'All branches',
+            ),
           _StatsBar(state: state),
           Expanded(
             child: state.logs.when(
@@ -45,10 +63,13 @@ class AuditLogsScreen extends ConsumerWidget {
               ),
               data: (page) {
                 if (page.logs.isEmpty) {
-                  return const EmptyState(
+                  final branchName = state.filter.shopId != null
+                      ? (shops.where((s) => s.id == state.filter.shopId).map((s) => s.name).firstOrNull ?? 'this branch')
+                      : null;
+                  return EmptyState(
                     icon: Icons.history_outlined,
-                    title: 'No audit logs found',
-                    subtitle: 'Adjust filters or try again later.',
+                    title: branchName == null ? 'No audit logs found' : 'No logs for $branchName',
+                    subtitle: branchName == null ? 'Adjust filters or try again later.' : 'Try switching to another branch or clear the branch filter.',
                   );
                 }
                 return RefreshIndicator(
@@ -78,36 +99,60 @@ class AuditLogsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showFilters(BuildContext context, WidgetRef ref, AuditFilter current) async {
+  Future<void> _showFilters(BuildContext context, WidgetRef ref, AuditFilter current, List<Shop> shops) async {
     String? module = current.module;
     String? actionType = current.actionType;
+    String? shopId = current.shopId;
+    final user = ref.read(currentUserProvider);
+    final isAdmin = user?.isAdmin ?? true;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           title: const Text('Filter Audit Logs'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: module,
-                decoration: const InputDecoration(labelText: 'Module'),
-                items: AppConstants.auditModules
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m == 'all' ? 'All modules' : Formatters.title(m))))
-                    .toList(),
-                onChanged: (v) => setState(() => module = v == 'all' ? null : v),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: actionType,
-                decoration: const InputDecoration(labelText: 'Action'),
-                items: AppConstants.actionLabels.entries
-                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                    .toList(),
-                onChanged: (v) => setState(() => actionType = v),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isAdmin && shops.isNotEmpty) ...[
+                  DropdownButtonFormField<String?>(
+                    initialValue: shopId,
+                    decoration: const InputDecoration(labelText: 'Branch'),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('All branches')),
+                      ...shops.map(
+                        (s) => DropdownMenuItem<String?>(
+                          value: s.id,
+                          child: Text(s.isWarehouse ? '${s.name} (Warehouse)' : s.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => shopId = v),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                DropdownButtonFormField<String?>(
+                  initialValue: module,
+                  decoration: const InputDecoration(labelText: 'Module'),
+                  items: AppConstants.auditModules
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m == 'all' ? 'All modules' : Formatters.title(m))))
+                      .toList(),
+                  onChanged: (v) => setState(() => module = v == 'all' ? null : v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  initialValue: actionType,
+                  decoration: const InputDecoration(labelText: 'Action'),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('All actions')),
+                    ...AppConstants.actionLabels.entries
+                        .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                  ],
+                  onChanged: (v) => setState(() => actionType = v),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -120,7 +165,13 @@ class AuditLogsScreen extends ConsumerWidget {
             FilledButton(
               onPressed: () {
                 ref.read(auditControllerProvider.notifier).setFilter(
-                      current.copyWith(module: module, actionType: actionType),
+                      AuditFilter(
+                        userId: current.userId,
+                        shopId: shopId,
+                        actionType: actionType,
+                        module: module,
+                        status: current.status,
+                      ),
                     );
                 Navigator.pop(ctx);
               },

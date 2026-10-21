@@ -65,8 +65,11 @@ class AuditRepository {
     );
   }
 
-  Future<AuditStats> getStats({int days = 30}) async {
-    final res = await _api.request('GET', '/audit/stats', query: {'days': '$days'});
+  Future<AuditStats> getStats({int days = 30, String? shopId}) async {
+    final res = await _api.request('GET', '/audit/stats', query: {
+      'days': '$days',
+      'shopId': ?shopId,
+    });
     return AuditStats.fromJson(res['data'] as Map<String, dynamic>);
   }
 

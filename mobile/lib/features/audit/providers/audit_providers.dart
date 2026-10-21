@@ -13,13 +13,21 @@ class AuditFilter {
 
   const AuditFilter({this.userId, this.shopId, this.actionType, this.module, this.status});
 
-  AuditFilter copyWith({String? userId, String? shopId, String? actionType, String? module, String? status}) {
+  static const Object _unset = Object();
+
+  AuditFilter copyWith({
+    Object? userId = _unset,
+    Object? shopId = _unset,
+    Object? actionType = _unset,
+    Object? module = _unset,
+    Object? status = _unset,
+  }) {
     return AuditFilter(
-      userId: userId,
-      shopId: shopId,
-      actionType: actionType,
-      module: module,
-      status: status,
+      userId: identical(userId, _unset) ? this.userId : userId as String?,
+      shopId: identical(shopId, _unset) ? this.shopId : shopId as String?,
+      actionType: identical(actionType, _unset) ? this.actionType : actionType as String?,
+      module: identical(module, _unset) ? this.module : module as String?,
+      status: identical(status, _unset) ? this.status : status as String?,
     );
   }
 }
@@ -65,8 +73,9 @@ class AuditController extends Notifier<AuditState> {
   }
 
   Future<void> _loadStats() async {
+    final f = state.filter;
     try {
-      final stats = await ref.read(auditRepositoryProvider).getStats();
+      final stats = await ref.read(auditRepositoryProvider).getStats(shopId: f.shopId);
       state = AuditState(logs: state.logs, stats: AsyncValue.data(stats), filter: state.filter);
     } catch (e, st) {
       state = AuditState(logs: state.logs, stats: AsyncValue.error(e, st), filter: state.filter);
@@ -74,13 +83,15 @@ class AuditController extends Notifier<AuditState> {
   }
 
   void setFilter(AuditFilter filter) {
-    state = AuditState(logs: const AsyncValue.loading(), stats: state.stats, filter: filter);
+    state = AuditState(logs: const AsyncValue.loading(), stats: const AsyncValue.loading(), filter: filter);
     _loadLogs();
+    _loadStats();
   }
 
   void clearFilter() {
-    state = AuditState(logs: const AsyncValue.loading(), stats: state.stats, filter: const AuditFilter());
+    state = AuditState(logs: const AsyncValue.loading(), stats: const AsyncValue.loading(), filter: const AuditFilter());
     _loadLogs();
+    _loadStats();
   }
 
   Future<void> refresh() {

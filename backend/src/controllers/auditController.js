@@ -56,22 +56,36 @@ const auditStats = asyncHandler(async (req, res) => {
   const days = parseInt(req.query.days, 10) || 30;
   const since = new Date(Date.now() - days * 86400000);
 
+  // Scope the counters to a single branch when the admin picks one.
+  // Managers are always locked to their own branch.
+  const scope = {};
+  if (req.user && req.user.role === 'manager') {
+    if (req.user.assignedShop) scope.shopId = req.user.assignedShop._id;
+  } else if (req.query.shopId) {
+    scope.shopId = req.query.shopId;
+  }
+
+  const inWindow = { timestamp: { $gte: since }, ...scope };
+
   const [total, today, byAction, byUser, deleted] = await Promise.all([
-    AuditLog.countDocuments({ timestamp: { $gte: since } }),
-    AuditLog.countDocuments({ timestamp: { $gte: new Date().setHours(0, 0, 0, 0) } }),
+    AuditLog.countDocuments(inWindow),
+    AuditLog.countDocuments({
+      timestamp: { $gte: new Date().setHours(0, 0, 0, 0) },
+      ...scope,
+    }),
     AuditLog.aggregate([
-      { $match: { timestamp: { $gte: since } } },
+      { $match: inWindow },
       { $group: { _id: '$actionType', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
     ]),
     AuditLog.aggregate([
-      { $match: { timestamp: { $gte: since } } },
+      { $match: inWindow },
       { $group: { _id: '$performedByName', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 8 },
     ]),
-    AuditLog.countDocuments({ timestamp: { $gte: since }, status: 'deleted' }),
+    AuditLog.countDocuments({ timestamp: { $gte: since }, status: 'deleted', ...scope }),
   ]);
 
   res.json(
