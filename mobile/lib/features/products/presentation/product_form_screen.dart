@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/status_views.dart';
@@ -159,6 +160,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   Uint8List? _productImageBytes;
   bool _imageRemoved = false;
   bool _isEdit = false;
+  /// The gallery of the product being edited. The list endpoints only carry a
+  /// path per photo, so the real bytes are pulled before saving.
+  List<String> _existingImages = const [];
 
   @override
   void initState() {
@@ -183,6 +187,31 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       try {
         _productImageBytes = base64.decode(existingImage.split(',').last);
       } catch (_) {}
+    } else if (p != null && p.id.isNotEmpty) {
+      // The photo is referenced by path in list responses: load the full
+      // product so the preview shows it and saving keeps it.
+      _loadExistingImages(p.id);
+    }
+  }
+
+  Future<void> _loadExistingImages(String id) async {
+    try {
+      final full = await ref.read(productRepositoryProvider).getProduct(id);
+      if (!mounted) return;
+      if (full.images.isEmpty) return;
+      setState(() {
+        _existingImages = full.images;
+        // The photo may have been removed while the product was loading.
+        if (_imageRemoved) return;
+        final first = full.images.first;
+        if (first.startsWith('data:image')) {
+          try {
+            _productImageBytes = base64.decode(first.split(',').last);
+          } catch (_) {}
+        }
+      });
+    } catch (_) {
+      // Keep whatever the list gave us; the save simply leaves images alone.
     }
   }
 
@@ -342,8 +371,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         data['images'] = [_buildImageDataUrl(_productImageBytes!)];
       } else if (_imageRemoved) {
         data['images'] = <String>[];
-      } else if (_isEdit && widget.product!.images.isNotEmpty) {
-        data['images'] = widget.product!.images;
+      } else if (_isEdit && _existingImages.isNotEmpty) {
+        data['images'] = _existingImages;
       }
     }
 
@@ -371,8 +400,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       data['images'] = [_buildImageDataUrl(_productImageBytes!)];
     } else if (_imageRemoved) {
       data['images'] = <String>[];
-    } else if (widget.product!.images.isNotEmpty) {
-      data['images'] = widget.product!.images;
+    } else if (_existingImages.isNotEmpty) {
+      data['images'] = _existingImages;
     }
 
     await _save(notifier, data);

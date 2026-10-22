@@ -7,6 +7,13 @@ const { recordAudit } = require('../middleware/auth');
 const { getWarehouseShop } = require('../utils/warehouse');
 const { isVariantType, usesColorRows, isLegacyCarpet, normalizeVariants, variantTotal } = require('../utils/variants');
 
+// Product photos are stored as base64 data URLs inside the product document.
+// Embedding them in every list response turned a product list into a
+// multi-megabyte payload (a single foam product carried ~2.3 MB of base64),
+// which made the stock screens crawl on slow connections. Lists now point at
+// the bytes and /products/:id/image/:index serves them on demand.
+const { withImageUrls } = require('../utils/imageUrls');
+
 const buildProductQuery = (req) => {
   const filter = { isDeleted: false };
   if (req.user.role === 'manager') {
@@ -48,7 +55,24 @@ const listProducts = asyncHandler(async (req, res) => {
     Product.countDocuments(filter),
   ]);
 
+  withImageUrls(products);
+
   res.json(ApiResponse.ok('Products fetched', { products, total, page, limit, totalPages: Math.ceil(total / limit) }));
+});
+
+// Streams one stored product photo. The list endpoints only reference the
+// images by path so the payload stays small; the bytes are pulled on demand.
+const getProductImage = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id).select('images isDeleted').lean();
+  if (!product || product.isDeleted) throw new ApiError(404, 'Product not found.');
+  const index = parseInt(req.params.index, 10);
+  const raw = (product.images || [])[index];
+  if (!raw) throw new ApiError(404, 'Image not found.');
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(raw);
+  const buffer = match ? Buffer.from(match[2], 'base64') : Buffer.from(raw, 'base64');
+  res.setHeader('Content-Type', match ? match[1] : 'image/jpeg');
+  res.setHeader('Cache-Control', 'private, max-age=86400');
+  res.send(buffer);
 });
 
 const getProduct = asyncHandler(async (req, res) => {
@@ -353,7 +377,17 @@ const lowStockProducts = asyncHandler(async (req, res) => {
   else if (req.shopId) filter.shop = req.shopId;
 
   const products = await Product.find(filter).populate('category', 'name').populate('shop', 'name').sort({ quantity: 1 });
+  withImageUrls(products);
   res.json(ApiResponse.ok('Low stock products fetched', products));
 });
 
-module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct, restoreProduct, lowStockProducts };
+module.exports = {
+  listProducts,
+  getProduct,
+  getProductImage,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  restoreProduct,
+  lowStockProducts,
+};

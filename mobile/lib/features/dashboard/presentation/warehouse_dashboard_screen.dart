@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/api/api_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/carpet_pattern.dart';
@@ -1078,10 +1079,30 @@ class _RoundAction extends StatelessWidget {
   }
 }
 
-class _ProductThumb extends StatelessWidget {
+class _ProductThumb extends StatefulWidget {
   const _ProductThumb({required this.image});
 
   final String image;
+
+  @override
+  State<_ProductThumb> createState() => _ProductThumbState();
+}
+
+class _ProductThumbState extends State<_ProductThumb> {
+  Map<String, String> _headers = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHeaders();
+  }
+
+  Future<void> _loadHeaders() async {
+    if (!ApiImage.isApiPath(widget.image)) return;
+    final headers = await ApiImage.headers();
+    if (!mounted) return;
+    setState(() => _headers = headers);
+  }
 
   static const double _size = 52;
 
@@ -1172,26 +1193,48 @@ class _ProductThumb extends StatelessWidget {
       ),
     );
 
+    final image = widget.image;
     if (image.isEmpty) return fallback();
-    ImageProvider provider;
+
+    Widget child;
     if (image.startsWith('data:image')) {
+      ImageProvider provider;
       try {
         provider = MemoryImage(base64Decode(image.split(',').last));
       } catch (_) {
         provider = MemoryImage(_transparentPixel);
       }
-    } else {
-      provider = NetworkImage(image);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image(
+      child = Image(
         image: provider,
         width: _size,
         height: _size,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => fallback(),
-      ),
+      );
+    } else if (ApiImage.isApiPath(image)) {
+      // Photos are referenced by path so product lists stay small; the bytes
+      // are fetched on demand with the session token.
+      child = Image.network(
+        ApiImage.absolute(image),
+        headers: _headers,
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      );
+    } else {
+      child = Image(
+        image: NetworkImage(image),
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: child,
     );
   }
 }

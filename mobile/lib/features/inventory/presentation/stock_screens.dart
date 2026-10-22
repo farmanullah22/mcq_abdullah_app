@@ -1455,6 +1455,9 @@ class _StockInScreenState extends ConsumerState<StockInScreen> {
   List<Product> _warehouseProducts = const [];
   bool _warehouseLoading = true;
   String? _warehouseName;
+  /// Bumped when the warehouse stock arrives so the product dropdown rebuilds
+  /// with the preselected product instead of keeping an empty field state.
+  int _warehouseEpoch = 0;
 
   @override
   void initState() {
@@ -1486,6 +1489,7 @@ class _StockInScreenState extends ConsumerState<StockInScreen> {
           _warehouseProducts = raw.map(Product.fromJson).toList();
           _warehouseLoading = false;
           _warehouseName = warehouse?['name']?.toString() ?? 'Warehouse';
+          _warehouseEpoch++;
           if (_productId != null) {
             final matches = _warehouseProducts
                 .where((p) => p.id == _productId)
@@ -1579,6 +1583,7 @@ class _StockInScreenState extends ConsumerState<StockInScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                key: ValueKey('in-product-$_warehouseEpoch'),
                 initialValue: _productId,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -2190,6 +2195,9 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
   bool _productsLoading = false;
   String? _shopsError;
   String? _productsError;
+  /// Bumped whenever the product list is reloaded so the dropdown rebuilds
+  /// with the new selection instead of keeping the stale field state.
+  int _productsEpoch = 0;
 
   @override
   void initState() {
@@ -2245,6 +2253,12 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
         } else if (_fromShopId == null && shops.isNotEmpty) {
           _fromShopId = shops.first.id;
         }
+        // Preselect the destination so the form is ready to submit and the
+        // dropdown shows the same shop the transfer will actually go to.
+        final allowed = _allowedDestinations(_fromShopId);
+        if (allowed.isNotEmpty && !allowed.any((s) => s.id == _toShopId)) {
+          _toShopId = allowed.first.id;
+        }
       });
       await _loadProducts();
     } catch (e) {
@@ -2274,6 +2288,7 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
       _products = const [];
       _productId = null;
       _selectedProduct = null;
+      _productsEpoch++;
     });
     try {
       final user = ref.read(currentUserProvider);
@@ -2344,6 +2359,7 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
                 )
               else ...[
                 DropdownButtonFormField<String>(
+                  key: ValueKey('tf-$_fromShopId'),
                   initialValue: _fromShopId,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -2373,6 +2389,7 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  key: ValueKey('tt-$_toShopId'),
                   initialValue: _toShopId,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -2405,6 +2422,7 @@ class _StockTransferScreenState extends ConsumerState<StockTransferScreen> {
                   )
                 else
                   DropdownButtonFormField<String>(
+                    key: ValueKey('tp-$_productsEpoch'),
                     initialValue: _productId,
                     isExpanded: true,
                     decoration: const InputDecoration(

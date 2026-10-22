@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get('/', scopedShop, productController.listProducts);
 router.get('/low-stock', scopedShop, productController.lowStockProducts);
+router.get('/:id/image/:index', productController.getProductImage);
 router.get('/:id', productController.getProduct);
 
 router.post('/', restrictTo('manager', 'admin'), productController.createProduct);

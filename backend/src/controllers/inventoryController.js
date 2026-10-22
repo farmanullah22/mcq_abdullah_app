@@ -719,6 +719,9 @@ const shopProducts = asyncHandler(async (req, res) => {
         'carpetPiecesData carpetWidth carpetHeight carpetPieces costPerSqft ' +
         'qaleenSizes costPerPiece meterLength costPerMeter color size variants'
     );
+  // Reference the photos instead of embedding them: this endpoint feeds a
+  // dropdown and the base64 gallery made it megabytes heavy.
+  require('../utils/imageUrls').withImageUrls(products);
   res.json(ApiResponse.ok('Shop products fetched', products));
 });
 
